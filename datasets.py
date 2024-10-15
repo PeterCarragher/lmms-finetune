@@ -6,7 +6,9 @@ from typing import Dict, List, Optional
 
 import numpy as np
 from torch.utils.data import Dataset
-
+from PIL import Image
+from io import BytesIO
+import base64
 
 TO_LOAD_IMAGE: Dict[str, bool] = {
     "llava-1.5": True,
@@ -39,6 +41,40 @@ def read_video_pyav(container, indices):
             frames.append(frame)
     return np.stack([x.to_ndarray(format="rgb24") for x in frames])
 
+with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.lineidx", "r") as fp_lineidx:
+    lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
+
+# def read_webqa_image(image_id, lineidx=lineidx):
+#     try:
+#         with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
+#             fp.seek(lineidx[int(image_id)%10000000])
+#             imgid, img_base64 = fp.readline().strip().split('\t')
+#         assert int(image_id) == int(imgid), f'{image_id} {imgid}'
+#         im = Image.open(BytesIO(base64.b64decode(img_base64)))
+#         return im
+#     except Exception as e:
+#         # generation
+#         return Image.open(image_file).convert("RGB")
+        
+
+# # def load_image(image_file):
+# #     if image_file.startswith("http") or image_file.startswith("https"):
+# #         response = requests.get(image_file)
+# #         image = Image.open(BytesIO(response.content)).convert("RGB")
+# #     else:
+# #         image = Image.open(image_file).convert("RGB")
+# #     return image
+
+
+# def load_images(image_files, webqa=False):
+#     out = []
+#     for image_file in image_files:
+#         if webqa:
+#             image = read_webqa_image(image_file)
+#         else:
+#             image = Image.open(image_file).convert("RGB")
+#         out.append(image)
+#     return out
 
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning 
@@ -89,13 +125,22 @@ class LazySupervisedDataset(Dataset):
             else:
                 raise ValueError(f"Invalid image source type: {type(source['image'])}")
             
-            for image_path in image_sources:
-                if self.image_folder is not None:
-                    image_path = os.path.join(self.image_folder, image_path)
-                images.append(
-                    Image.open(image_path).convert("RGB")
-                    if self.load_image else image_path
-                )
+            for image_id in image_sources:              
+                try:
+                    with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
+                        fp.seek(lineidx[int(image_id)%10000000])
+                        imgid, img_base64 = fp.readline().strip().split('\t')
+                    assert int(image_id) == int(imgid), f'{image_id} {imgid}'
+                    images.append(Image.open(BytesIO(base64.b64decode(img_base64))))
+                except Exception as e:
+                    # generation
+                    if self.image_folder is not None:
+                        image_id = os.path.join(self.image_folder, image_id)
+                    images.append(Image.open(image_id).convert("RGB"))
+                # images.append(
+                #     Image.open(image_path).convert("RGB")
+                #     if self.load_image else image_path
+                # )
 
         videos = []
         if "video" in source:
