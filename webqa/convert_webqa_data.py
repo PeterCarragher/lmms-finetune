@@ -1,11 +1,13 @@
 import json
 import numpy as np
 
-def get_prompt(data, key):
+def get_prompt(data, key, reverse_images = False):
     imgs = data[key]['img_posFacts']
     if len(imgs) == 1:
         return f"<image> \n Caption: {imgs[0]['title']} \n Question: {data[key]['Q']}"
     assert(len(imgs) == 2)
+    if reverse_images:
+        return f"<image> \n Caption: {imgs[1]['title']} \n <image> \n Caption: {imgs[0]['title']} \n Question: {data[key]['Q']}"
     return f"<image> \n Caption: {imgs[0]['title']} \n <image> \n Caption: {imgs[1]['title']} \n Question: {data[key]['Q']}"
 
 # def get_image_path(image_id):
