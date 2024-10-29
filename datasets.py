@@ -127,13 +127,17 @@ class LazySupervisedDataset(Dataset):
             
             for image_id in image_sources:              
                 try:
+                    image_path_int = int(image_id)
+                except:
+                    image_path_int = None
+                    
+                if image_path_int:
                     with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
                         fp.seek(lineidx[int(image_id)%10000000])
                         imgid, img_base64 = fp.readline().strip().split('\t')
                     assert int(image_id) == int(imgid), f'{image_id} {imgid}'
                     images.append(Image.open(BytesIO(base64.b64decode(img_base64))))
-                except Exception as e:
-                    # generation
+                else:
                     if self.image_folder is not None:
                         image_id = os.path.join(self.image_folder, image_id)
                     images.append(Image.open(image_id).convert("RGB"))
