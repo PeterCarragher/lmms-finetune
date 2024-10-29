@@ -12,7 +12,7 @@ def get_messages(data, conversational_prompt=True, reverse_images = False):#, im
         prompt = ""
         for id, img in enumerate(imgs):
             prompt += f"<|image_{id + 1}|>\nCaption: {img['title']}\n"
-        prompt += f"Question: {data['Q']}"
+        prompt += f"Q: {data['Q']}"
         return [{"role": "user", "content": prompt}]
     
     message = {"role": "user", "content": []}
@@ -20,9 +20,8 @@ def get_messages(data, conversational_prompt=True, reverse_images = False):#, im
         message["content"].append({"type": "image"})
         message["content"].append({"type": "text", "text": f"Caption: {img['title']}"})
     
-    message["content"].append({"type": "text", "text": f"Question: {data['Q']}"})
+    message["content"].append({"type": "text", "text": f"Q: {data['Q']}"})
     return [message]
-
 
 def get_images(image_paths, reverse_images = False):
     images = []
@@ -42,25 +41,26 @@ def get_images(image_paths, reverse_images = False):
 
     return images
 
-system_prompt = "Answer the following question based only on the provided images.\n"
+system_prompt = "Answer question Q based only on the provided images.\n"
 
 
 def eval_on_webqa_sample(image_paths, data, processor, model, conversational_prompt, reverse_images = False):
     images = get_images(image_paths, reverse_images)
     messages = get_messages(data, conversational_prompt, reverse_images)
-    text = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         
     # query = f"SYSTEM: {system_prompt}\nHUMAN: {query}\nGPT:"
     # print(query) 
     if conversational_prompt:
-        inputs = processor(images=images, text=[text], return_tensors='pt', padding=True)
+        text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = processor(images=images, text=text, return_tensors='pt', padding=True)
     else:
+        text = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = processor(text, images, return_tensors="pt")
     inputs = inputs.to("cuda")
     output = model.generate(
         **inputs, 
         max_new_tokens=50,
-        # do_sample=False, 
+        do_sample=False, 
         # max_length=100,
         # num_return_sequences=1,
         # temperature=0.0,

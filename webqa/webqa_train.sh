@@ -9,8 +9,12 @@ DISTRIBUTED_ARGS="
 # arguments that are very likely to be changed
 # according to your own case
 MODEL_ID=llava-1.5-7b                                   # model id; pick on by running `python supported_models.py`
-TRAIN_DATA_PATH=./webqa/webqa_train_formatted.json  # path to the training data json file
-EVAL_DATA_PATH=./webqa/webqa_val_formatted.json    # path to the evaluation data json file (optional)
+# MODEL_ID=llava-1.5-7b
+VERSION=2                                   # model id; pick on by running `python supported_models.py`
+TRAIN_DATA_PATH=./webqa/data/webqa_train_gen_formatted_v${VERSION}.json  # path to the training data json file
+EVAL_DATA_PATH=./webqa/data/webqa_val_gen_formatted_v${VERSION}.json    # path to the evaluation data json file (optional)
+# TRAIN_DATA_PATH=./webqa/webqa_train_formatted.json  # path to the training data json file
+# EVAL_DATA_PATH=./webqa/webqa_val_formatted.json    # path to the evaluation data json file (optional)
 # IMAGE_FOLDER=./example_data/images                      # path to the image root folder; if provided, the image paths in the json should be relative
 # VIDEO_FOLDER=./example_data/videos                      # path to the video root folder; if provided, the video paths in the json should be relative
 # NUM_FRAMES=8                                            # how many frames are sampled from each video
@@ -18,13 +22,13 @@ EVAL_DATA_PATH=./webqa/webqa_val_formatted.json    # path to the evaluation data
 TRAIN_VISION_ENCODER=True                              # whether train the vision encoder
 USE_VISION_LORA=True                                   # whether use lora for vision encoder (only effective when `TRAIN_VISION_ENCODER` is True)
 TRAIN_VISION_PROJECTOR=True                            # whether train the vision projector (only full finetuning is supported)
-
+ 
 USE_LORA=True                                           # whether use lora for llm
 Q_LORA=False                                            # whether use q-lora for llm; only effective when `USE_LORA` is True
 LORA_R=8                                                # the lora rank (both llm and vision encoder)
 LORA_ALPHA=16                                            # the lora alpha (both llm and vision encoder)
 
-RUN_ID=${MODEL_ID}_lora-${USE_LORA}_qlora-${Q_LORA}     # a custom run id that determines the checkpoint folder and wandb run name
+RUN_ID=${MODEL_ID}_v${VERSION}_lora-${USE_LORA}_qlora-${Q_LORA}     # a custom run id that determines the checkpoint folder and wandb run name
 
 DS_STAGE=zero3                                          # deepspeed stage; < zero2 | zero3 >
 PER_DEVICE_BATCH_SIZE=8                                 # batch size per GPU
