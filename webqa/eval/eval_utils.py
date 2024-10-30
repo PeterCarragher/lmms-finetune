@@ -4,6 +4,8 @@ from eval.eval_1022 import *
 import torch
 from PIL import Image
 import torch
+import matplotlib.pyplot as plt
+from PIL import Image
 from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGeneration, Qwen2VLForConditionalGeneration, AutoModelForCausalLM 
 from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 
@@ -152,3 +154,33 @@ def accuracy_agg_generated_results(qa_results, eval_data):
     avr_acc = np.mean([PR_avg for key, dict in qa_results.items() for idx, (_,_,_,_,PR_avg) in dict.items()])
     
     return (single_acc, two_image_acc, avr_acc)
+
+def capitalize_word_in_sentence(sentence, word):
+    sentence = sentence.split()
+    for i, w in enumerate(sentence):
+        if w.lower() == word.lower():
+            sentence[i] = w.upper()
+    return ' '.join(sentence)
+
+def image_equals(img1, img2):
+    if img1.size != img2.size:
+        return "Wrong size"
+    return np.allclose(np.array(img1), np.array(img2))
+
+def display_images(image1, image2, q, image1_title, image2_title, savefile=None):
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+    # reduce image dimensions to fit in plot    
+    ax[0].imshow(image1)
+    # ax[1].imshow(mask)
+    ax[1].imshow(image2)
+    ax[0].set_title(image1_title)
+    ax[1].set_title(image2_title)
+    plt.suptitle(q, fontsize = 17)
+    # remove gap between title and images
+    plt.subplots_adjust(top=0.9, wspace=0.03)
+    # plt.tight_layout(rect=[0, 0, 1, 0.9])
+    for a in ax:
+        a.axis('off')
+    if savefile:
+        plt.savefig(f"examples/{savefile}", bbox_inches='tight', dpi=300)    
+    plt.show()
