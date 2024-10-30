@@ -29,6 +29,19 @@ domain_dict = {
     'number': [str(i) for i in range(20,-1,-1)],
 }
 
+with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.lineidx", "r") as fp_lineidx:
+    lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
+
+def load_webqa_image(image_id):
+    with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
+        fp.seek(lineidx[int(image_id)%10000000])
+        imgid, img_base64 = fp.readline().strip().split('\t')
+    assert int(image_id) == int(imgid), f'{image_id} {imgid}'
+    return Image.open(BytesIO(base64.b64decode(img_base64)))
+               
+def load_image(image_path):
+    return Image.open(image_path).convert("RGB")
+
 def detectNum(l):
     result = []
     for w in l:
@@ -154,19 +167,6 @@ def compute_vqa_metrics(cands, a, exclude="", domain=None):
 
 # bart_scorer_ParaBank = BARTScorer(device='cuda', checkpoint='facebook/bart-large-cnn')
 # bart_scorer_ParaBank.load(path='bart_score.pth') # Please change the path to bart.pth
-
-# with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.lineidx", "r") as fp_lineidx:
-#     lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
-
-# def load_webqa_image(image_id):
-#     with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
-#         fp.seek(lineidx[int(image_id)%10000000])
-#         imgid, img_base64 = fp.readline().strip().split('\t')
-#     assert int(image_id) == int(imgid), f'{image_id} {imgid}'
-#     return Image.open(BytesIO(base64.b64decode(img_base64)))
-               
-# def load_image(image_path):
-#     return Image.open(image_path).convert("RGB")
 
 
 

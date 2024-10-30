@@ -1,8 +1,7 @@
-from eval_1022 import *
-
+import sys
+sys.path.append("..")
+from eval.eval_1022 import *
 import torch
-from PIL import Image
-import convert_webqa_data
 from PIL import Image
 import torch
 from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGeneration, Qwen2VLForConditionalGeneration, AutoModelForCausalLM 
