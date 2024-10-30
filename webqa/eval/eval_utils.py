@@ -51,8 +51,8 @@ def get_messages(data, conversational_prompt=True, reverse_images = False):#, im
 def get_qa_check_prompt(question, conversational_prompt=True):
     if not conversational_prompt:
         prompt = ""
-        prompt += f"<|image_{id + 1}|>\nCaption: original image\n"
-        prompt += f"<|image_{id + 1}|>\nCaption: perturbed image\n"
+        prompt += f"<|image_1|>\nCaption: original image\n"
+        prompt += f"<|image_2|>\nCaption: perturbed image\n"
         prompt += question
         return [{"role": "user", "content": prompt}]
     
