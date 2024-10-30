@@ -13,42 +13,21 @@ import string, re
 from collections import Counter, defaultdict
 from pprint import pprint
 import spacy
-nlp = spacy.load("en_core_web_sm", disable=["ner","textcat","parser"])
-np.set_printoptions(precision=4)
-
 import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--Qcate_breakdown", type=str, default='["all"]')
-parser.add_argument("--file", type=str, default="img_queries_VLP_vinvl_combinedTraining_val_beam5_img_step13_cleaned.tsv")
-parser.add_argument('--no_norm', action='store_true')
-parser.add_argument('--dir', type=str, default="")
-parser.add_argument('--output_idx', type=int, default=0)
-args = parser.parse_args()
-
 import sys
 from PIL import Image
 from io import BytesIO
 import base64
 
-# sys.path.append("/home/yingshac/CYS/WebQnA/VLP/BARTScore")
-# from bart_score import BARTScorer
+nlp = spacy.load("en_core_web_sm", disable=["ner","textcat","parser"])
+np.set_printoptions(precision=4)
 
-# bart_scorer_ParaBank = BARTScorer(device='cuda', checkpoint='facebook/bart-large-cnn')
-# bart_scorer_ParaBank.load(path='bart_score.pth') # Please change the path to bart.pth
-
-with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.lineidx", "r") as fp_lineidx:
-    lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
-
-def load_webqa_image(image_id):
-    with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
-        fp.seek(lineidx[int(image_id)%10000000])
-        imgid, img_base64 = fp.readline().strip().split('\t')
-    assert int(image_id) == int(imgid), f'{image_id} {imgid}'
-    return Image.open(BytesIO(base64.b64decode(img_base64)))
-               
-def load_image(image_path):
-    return Image.open(image_path).convert("RGB")
+domain_dict = {
+    'color': ['orangebrown', 'spot', 'yellow', 'blue', 'rainbow', 'ivory', 'brown', 'gray', 'teal', 'bluewhite', 'orangepurple', 'black', 'white', 'gold', 'redorange', 'pink', 'blonde', 'tan', 'turquoise', 'grey', 'beige', 'golden', 'orange', 'bronze', 'maroon', 'purple', 'bluere', 'red', 'rust', 'violet', 'transparent', 'silver', 'chrome', 'green', 'aqua'],
+    'shape': ['globular', 'octogon', 'ring', 'hoop', 'octagon', 'concave', 'flat', 'wavy', 'shamrock', 'cross', 'cylinder', 'cylindrical', 'pentagon', 'point', 'pyramidal', 'crescent', 'rectangular', 'hook', 'tube', 'cone', 'bell', 'spiral', 'ball', 'convex', 'square', 'arch', 'cuboid', 'step', 'rectangle', 'dot', 'oval', 'circle', 'star', 'crosse', 'crest', 'octagonal', 'cube', 'triangle', 'semicircle', 'domeshape', 'obelisk', 'corkscrew', 'curve', 'circular', 'xs', 'slope', 'pyramid', 'round', 'bow', 'straight', 'triangular', 'heart', 'fork', 'teardrop', 'fold', 'curl', 'spherical', 'diamond', 'keyhole', 'conical', 'dome', 'sphere', 'bellshaped', 'rounded', 'hexagon', 'flower', 'globe', 'torus'],
+    'yesno': ['yes', 'no'],
+    'number': [str(i) for i in range(20,-1,-1)],
+}
 
 def detectNum(l):
     result = []
@@ -89,6 +68,29 @@ def normalize_text(s):
         return lemmatization(white_space_fix(remove_punc(lower(s))))
 
     return lemmatization(white_space_fix(remove_articles(remove_punc(lower(s)))))
+
+def find_first_search_term(string, search_terms, qcate, clean_answer):
+    answer_label = None
+    for term in search_terms:
+        if term in string:
+            answer_label = term
+    if not answer_label:
+        if qcate == 'yesno':
+            # Big dirty YES assumption hack
+            # TODO: kill with fire, there is / there are / there are not, etc.
+            answer_label = 'yes'
+        elif qcate == 'number':
+            if " no " in clean_answer or "none" in clean_answer:
+                answer_label = '0'
+            elif " once" in clean_answer or " single":
+                answer_label = '1'
+            elif "twice" in clean_answer:
+                answer_label = '2'
+            else:
+                return None   
+        else:
+            return None
+    return answer_label
 
 # VQA Eval (SQuAD style EM, F1)
 def compute_vqa_metrics(cands, a, exclude="", domain=None):
@@ -137,9 +139,35 @@ def compute_vqa_metrics(cands, a, exclude="", domain=None):
     F1_max = np.max(F1)
     return (F1_avg, F1_max, EM, RE_avg, PR_avg)
 
-color_set= {'orangebrown', 'spot', 'yellow', 'blue', 'rainbow', 'ivory', 'brown', 'gray', 'teal', 'bluewhite', 'orangepurple', 'black', 'white', 'gold', 'redorange', 'pink', 'blonde', 'tan', 'turquoise', 'grey', 'beige', 'golden', 'orange', 'bronze', 'maroon', 'purple', 'bluere', 'red', 'rust', 'violet', 'transparent', 'yes', 'silver', 'chrome', 'green', 'aqua'}
-shape_set = {'globular', 'octogon', 'ring', 'hoop', 'octagon', 'concave', 'flat', 'wavy', 'shamrock', 'cross', 'cylinder', 'cylindrical', 'pentagon', 'point', 'pyramidal', 'crescent', 'rectangular', 'hook', 'tube', 'cone', 'bell', 'spiral', 'ball', 'convex', 'square', 'arch', 'h', 'cuboid', 'step', 'rectangle', 'dot', 'oval', 'circle', 'star', 'crosse', 'crest', 'octagonal', 'cube', 'triangle', 'semicircle', 'domeshape', 'obelisk', 'corkscrew', 'curve', 'circular', 'xs', 'slope', 'pyramid', 'round', 'bow', 'straight', 'triangular', 'heart', 'fork', 'teardrop', 'fold', 'curl', 'spherical', 'diamond', 'keyhole', 'conical', 'dome', 'sphere', 'bellshaped', 'rounded', 'hexagon', 'flower', 'globe', 'torus'}
-yesno_set = {'yes', 'no'}
+
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--Qcate_breakdown", type=str, default='["all"]')
+# parser.add_argument("--file", type=str, default="img_queries_VLP_vinvl_combinedTraining_val_beam5_img_step13_cleaned.tsv")
+# parser.add_argument('--no_norm', action='store_true')
+# parser.add_argument('--dir', type=str, default="")
+# parser.add_argument('--output_idx', type=int, default=0)
+# args = parser.parse_args()
+
+
+# sys.path.append("/home/yingshac/CYS/WebQnA/VLP/BARTScore")
+# from bart_score import BARTScorer
+
+# bart_scorer_ParaBank = BARTScorer(device='cuda', checkpoint='facebook/bart-large-cnn')
+# bart_scorer_ParaBank.load(path='bart_score.pth') # Please change the path to bart.pth
+
+# with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.lineidx", "r") as fp_lineidx:
+#     lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
+
+# def load_webqa_image(image_id):
+#     with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
+#         fp.seek(lineidx[int(image_id)%10000000])
+#         imgid, img_base64 = fp.readline().strip().split('\t')
+#     assert int(image_id) == int(imgid), f'{image_id} {imgid}'
+#     return Image.open(BytesIO(base64.b64decode(img_base64)))
+               
+# def load_image(image_path):
+#     return Image.open(image_path).convert("RGB")
+
 
 
 # TABLE = str.maketrans(dict.fromkeys(string.punctuation)) 

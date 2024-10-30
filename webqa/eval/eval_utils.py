@@ -49,6 +49,23 @@ def get_messages(data, conversational_prompt=True, reverse_images = False):#, im
     message["content"].append({"type": "text", "text": f"Q: {data['Q']}"})
     return [message]
 
+def get_qa_check_prompt(question, conversational_prompt=True):
+    if not conversational_prompt:
+        prompt = ""
+        prompt += f"<|image_{id + 1}|>\nCaption: original image\n"
+        prompt += f"<|image_{id + 1}|>\nCaption: perturbed image\n"
+        prompt += question
+        return [{"role": "user", "content": prompt}]
+    
+    message = {"role": "user", "content": []}
+    message["content"].append({"type": "image"})
+    message["content"].append({"type": "text", "text": f"Caption: original image"})
+    message["content"].append({"type": "image"})
+    message["content"].append({"type": "text", "text": f"Caption: perturbed image"})
+    message["content"].append({"type": "text", "text": question})
+    return [message]
+
+
 def get_images(image_paths, reverse_images = False):
     images = []
     if reverse_images:
@@ -67,7 +84,9 @@ def get_images(image_paths, reverse_images = False):
 
     return images
 
-system_prompt = "Answer question Q based only on the provided images.\n"
+# TODO: how to include system prompt with apply_chat_template? 
+# https://github.com/huggingface/transformers/issues/27922
+# system_prompt = "Answer question Q based only on the provided images.\n"
 
 def run_inference(messages, images, processor, model, conversational_prompt):
     if conversational_prompt:
