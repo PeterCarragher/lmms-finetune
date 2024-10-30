@@ -45,29 +45,8 @@ for model_path in model_paths:
     # model_id = "/home/pcarragh/dev/webqa/lmms-finetune/checkpoints/llava-1.5-7b_lora-True_qlora-False/"
     # model_path = model_id
     
-    conversational_prompt = True
-    if "llava-v1.6" in model_path or "llava-1.6" in model_path:
-        processor = LlavaNextProcessor.from_pretrained(model_path)
-        model = LlavaNextForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16).to("cuda")#, low_cpu_mem_usage=True) 
-    elif "llava" in model_path:
-        model = LlavaForConditionalGeneration.from_pretrained(
-            model_path, # model_id, 
-            torch_dtype=torch.float16, 
-            # low_cpu_mem_usage=True, 
-        ).to("cuda")
-        processor = AutoProcessor.from_pretrained(original_model_id)
-    elif "Qwen" in model_path:
-        model = Qwen2VLForConditionalGeneration.from_pretrained(
-            model_path, torch_dtype="auto", device_map="auto"
-        )
-        processor = AutoProcessor.from_pretrained(model_path)
-    elif "Phi" in model_path:
-        model = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda", trust_remote_code=True, torch_dtype="auto", _attn_implementation='flash_attention_2') 
-        # use _attn_implementation='eager' to disable flash attention
-        processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True) 
-        conversational_prompt = False
-    else:
-        raise ValueError(f"Unknown model path: {model_path}")
+    conversational_prompt = not 'Phi' in model_path
+    model, processor = get_model_processor(model_path)
 
     llava_results_baseline_original_label = {}
     llava_results_baseline_perturbed_label = {}
@@ -78,8 +57,8 @@ for model_path in model_paths:
 
     for k in tqdm(keys):
         example = eval_data[k]
-        if len(example['img_posFacts']) != 2:
-            continue
+        # if len(example['img_posFacts']) != 2:
+        #     continue
         original_image_files = [str(img_data['image_id']) for img_data in example['img_posFacts']]
         blank_image_files = [blank_image_file for _ in example['img_posFacts']]
         try:

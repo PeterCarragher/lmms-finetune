@@ -5,6 +5,32 @@ from PIL import Image
 import convert_webqa_data
 from PIL import Image
 import torch
+from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGeneration, Qwen2VLForConditionalGeneration, AutoModelForCausalLM 
+from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+
+def get_model_processor(model_path):
+    if "llava-v1.6" in model_path or "llava-1.6" in model_path:
+        processor = LlavaNextProcessor.from_pretrained(model_path)
+        model = LlavaNextForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16).to("cuda")#, low_cpu_mem_usage=True) 
+    elif "llava" in model_path:
+        model = LlavaForConditionalGeneration.from_pretrained(
+            model_path, # model_id, 
+            torch_dtype=torch.float16, 
+            # low_cpu_mem_usage=True, 
+        ).to("cuda")
+        processor = AutoProcessor.from_pretrained(model_path)
+    elif "Qwen" in model_path:
+        model = Qwen2VLForConditionalGeneration.from_pretrained(
+            model_path, torch_dtype="auto", device_map="auto"
+        )
+        processor = AutoProcessor.from_pretrained(model_path)
+    elif "Phi" in model_path:
+        model = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda", trust_remote_code=True, torch_dtype="auto", _attn_implementation='flash_attention_2') 
+        # use _attn_implementation='eager' to disable flash attention
+        processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True) 
+    else:
+        raise ValueError(f"Unknown model path: {model_path}")
+    return model, processor
 
 def get_messages(data, conversational_prompt=True, reverse_images = False):#, img_token = "<image>"): # "<image-placeholder">
     imgs = data['img_posFacts'] if not reverse_images else data['img_posFacts'][::-1]
@@ -43,13 +69,7 @@ def get_images(image_paths, reverse_images = False):
 
 system_prompt = "Answer question Q based only on the provided images.\n"
 
-
-def eval_on_webqa_sample(image_paths, data, processor, model, conversational_prompt, reverse_images = False):
-    images = get_images(image_paths, reverse_images)
-    messages = get_messages(data, conversational_prompt, reverse_images)
-        
-    # query = f"SYSTEM: {system_prompt}\nHUMAN: {query}\nGPT:"
-    # print(query) 
+def run_inference(messages, images, processor, model, conversational_prompt):
     if conversational_prompt:
         text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = processor(images=images, text=text, return_tensors='pt', padding=True)
@@ -66,6 +86,14 @@ def eval_on_webqa_sample(image_paths, data, processor, model, conversational_pro
         # temperature=0.0,
     )
     return processor.decode(output[0][2:], skip_special_tokens=True)
+
+
+def eval_on_webqa_sample(image_paths, data, processor, model, conversational_prompt, reverse_images = False):
+    images = get_images(image_paths, reverse_images)
+    messages = get_messages(data, conversational_prompt, reverse_images)
+    return run_inference(messages, images, processor, model, conversational_prompt)
+    # query = f"SYSTEM: {system_prompt}\nHUMAN: {query}\nGPT:"
+    # print(query) 
 
 
 def webqa_accuracy(answer, label, Qcate):
