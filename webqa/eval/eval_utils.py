@@ -9,9 +9,9 @@ from PIL import Image
 from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGeneration, Qwen2VLForConditionalGeneration, AutoModelForCausalLM 
 from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 
-def get_model_processor(model_path):
+def get_model_processor(model_path, original_model_id=None):
     if "llava-v1.6" in model_path or "llava-1.6" in model_path:
-        processor = LlavaNextProcessor.from_pretrained(model_path)
+        processor = LlavaNextProcessor.from_pretrained(original_model_id)
         model = LlavaNextForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16).to("cuda")#, low_cpu_mem_usage=True) 
     elif "llava" in model_path:
         model = LlavaForConditionalGeneration.from_pretrained(
@@ -19,17 +19,17 @@ def get_model_processor(model_path):
             torch_dtype=torch.float16, 
             # low_cpu_mem_usage=True, 
         ).to("cuda")
-        processor = AutoProcessor.from_pretrained(model_path)
+        processor = AutoProcessor.from_pretrained(original_model_id)
     elif "Qwen" in model_path:
         model = Qwen2VLForConditionalGeneration.from_pretrained(
             model_path, torch_dtype="auto", 
             device_map="auto"
         )
-        processor = AutoProcessor.from_pretrained(model_path)
+        processor = AutoProcessor.from_pretrained(original_model_id)
     elif "Phi" in model_path:
         model = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda", trust_remote_code=True, torch_dtype="auto", _attn_implementation='flash_attention_2') 
         # use _attn_implementation='eager' to disable flash attention
-        processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True) 
+        processor = AutoProcessor.from_pretrained(original_model_id, trust_remote_code=True) 
     else:
         raise ValueError(f"Unknown model path: {model_path}")
     return model, processor
@@ -112,7 +112,8 @@ def run_inference(messages, images, processor, model, conversational_prompt):
 def eval_on_webqa_sample(image_paths, data, processor, model, conversational_prompt, reverse_images = False):
     images = get_images(image_paths, reverse_images)
     messages = get_messages(data, conversational_prompt, reverse_images)
-    return run_inference(messages, images, processor, model, conversational_prompt)
+    ans = run_inference(messages, images, processor, model, conversational_prompt)
+    return ans.split('\n')[0].split('ASSISTANT: ')[0]
     # query = f"SYSTEM: {system_prompt}\nHUMAN: {query}\nGPT:"
     # print(query) 
 
@@ -129,6 +130,23 @@ def webqa_accuracy(answer, label, Qcate):
     else:
         return None
     return (F1_avg, F1_max, EM, RE_avg, PR_avg)
+
+retrieval_phrases = [
+    "white background", 
+    "sorry", 
+    "I cannot",# answer", 
+    "I do not", 
+    "image does not", 
+    "any information", 
+    "not enough", 
+    "not clear", 
+    "not visible", 
+    "not sure", 
+    "not able",     
+]
+
+def retrieval_predicted(answer):
+    return "<RET>" in answer or any([phrase in answer for phrase in retrieval_phrases])
 
 def ans_contains_any_label(ans, labels = ['yes', 'no']):
         return any([label in ans.lower() for label in labels])

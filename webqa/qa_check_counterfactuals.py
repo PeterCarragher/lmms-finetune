@@ -24,7 +24,7 @@ version = "1"
 
 # model_path = "Qwen/Qwen2-VL-72B-Instruct-AWQ" #
 # model_path = "Qwen/Qwen2-VL-7B-Instruct" # 
-model_path = "Qwen/Qwen2-VL-72B-Instruct-GPTQ-Int4"
+model_path = "Qwen/Qwen2-VL-7B-Instruct-GPTQ-Int4"
 model, processor = get_model_processor(model_path)
 conversational_prompt = not 'Phi' in model_path
 
@@ -48,8 +48,9 @@ for k in tqdm(keys):
         except Exception as e:
             # print(f"Error: {e}")
             continue
-        qa_check = run_inference(messages, images, processor, model, conversational_prompt)    
+        qa_check = run_inference(messages, images, processor, model, conversational_prompt)
+        qa_check = qa_check.split('\n')[-1]
         qa_check_answers[k][original_image_file] = qa_check
         with open(f"data/{output_file}_v{version}.csv", "a") as f:
-            f.write(f"{model_path},{k},{original_image_file},{qa_check}\n")
+            f.write(f"{model_path},{k},{original_image_file},\"{qa_check}\"\n")
 
