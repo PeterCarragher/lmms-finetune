@@ -8,10 +8,22 @@ sys.path.append("..")
 
 from eval.eval_utils import *
 
-# eval_data = json.load(open("/home/pcarragh/dev/webqa/LLaVA/WebQA_train_val_color_gpt_matched.json", "r"))
-eval_data = json.load(open("/home/pcarragh/dev/webqa/MultiModalQA/data/WebQA_train_val_obj_v2.json.pert.lama.v3", "r"))
+# TODO merge all json files in /
+
+def merge_json_files(path):
+    data = {}   
+    for file in os.listdir(path):
+        if not file.endswith(".json"):
+            continue
+        with open(f"{path}/{file}", "r") as f:
+            new_data = json.load(f)
+            new_data = {k: v for k, v in new_data.items() if 'A_perturbed' in v}
+            data.update(new_data)
+    return data
+
+eval_data = merge_json_files("/data/nikitha/VQA_data/labels_shape_color")
 eval_data = {k: v for k, v in eval_data.items() if v['Qcate'].lower() in ['shape', 'color']}
-perturbation_path = "/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa"
+perturbation_path = "/data/nikitha/VQA_data/results/webqa"
 use_split = True
 save = False
 
