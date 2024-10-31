@@ -52,9 +52,10 @@ conda activate lmms-finetune
 ## this will install the latest version of torch
 ## feel free to change it to a specific version
 python -m pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 
 ## optionally install flash attention
-python -m pip install --no-cache-dir --no-build-isolation flash-attn
+# python -m pip install --no-cache-dir --no-build-isolation flash-attn
 ```
 
 ## Usage

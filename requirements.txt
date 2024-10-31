@@ -17,3 +17,8 @@ transformers_stream_generator
 
 # for webui
 gradio
+
+spacy
+word2number
+optimum
+auto-gptq
