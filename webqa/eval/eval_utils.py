@@ -22,7 +22,8 @@ def get_model_processor(model_path):
         processor = AutoProcessor.from_pretrained(model_path)
     elif "Qwen" in model_path:
         model = Qwen2VLForConditionalGeneration.from_pretrained(
-            model_path, torch_dtype="auto", device_map="auto"
+            model_path, torch_dtype="auto", 
+            device_map="auto"
         )
         processor = AutoProcessor.from_pretrained(model_path)
     elif "Phi" in model_path:
@@ -99,7 +100,7 @@ def run_inference(messages, images, processor, model, conversational_prompt):
     inputs = inputs.to("cuda")
     output = model.generate(
         **inputs, 
-        max_new_tokens=50,
+        max_new_tokens=20,
         do_sample=False, 
         # max_length=100,
         # num_return_sequences=1,
