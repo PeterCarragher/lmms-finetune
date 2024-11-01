@@ -10,6 +10,8 @@ from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGenera
 from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 
 def get_model_processor(model_path, original_model_id=None):
+    if not original_model_id:
+        original_model_id = model_path
     if "llava-v1.6" in model_path or "llava-1.6" in model_path:
         processor = LlavaNextProcessor.from_pretrained(original_model_id)
         model = LlavaNextForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16).to("cuda")#, low_cpu_mem_usage=True) 
