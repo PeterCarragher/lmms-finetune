@@ -33,11 +33,14 @@ color_set = set(domain_dict['color'])
 shape_set = set(domain_dict['shape'])
 yesno_set = set(domain_dict['yesno'])
 
-with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.lineidx", "r") as fp_lineidx:
+# data_root = "/home/pcarragh/dev/webqa/UniVL-DR/data"
+data_root = "/data/nikitha/VQA_data"
+
+with open(f"{data_root}/imgs.lineidx", "r") as fp_lineidx:
     lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
 
 def load_webqa_image(image_id):
-    with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
+    with open(f"{data_root}/imgs.tsv", "r") as fp:
         fp.seek(lineidx[int(image_id)%10000000])
         imgid, img_base64 = fp.readline().strip().split('\t')
     assert int(image_id) == int(imgid), f'{image_id} {imgid}'

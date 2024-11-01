@@ -15,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument("--version", type=str, default="2")
     parser.add_argument("--perturbation_path", type=str, required=True)
     parser.add_argument("--eval_data_path", type=str, required=True)
-    parser.add_argument("--counterfactual", type=bool, default=True)
+    parser.add_argument("--counterfactual", type=int, default=1)
     args = parser.parse_args()
     # model_path = "Qwen/Qwen2-VL-72B-Instruct-AWQ" #
     # model_path = "Qwen/Qwen2-VL-7B-Instruct" # 
@@ -24,12 +24,13 @@ if __name__ == "__main__":
     version = args.version
     perturbation_path = args.perturbation_path
     eval_data = json.load(open(args.eval_data_path, "r"))
-    use_counterfactual_question = args.counterfactual
+    use_counterfactual_question = args.counterfactual == 1
 
     model, processor = get_model_processor(model_path)
     conversational_prompt = not 'Phi' in model_path
     output_str = "counterfactual" if use_counterfactual_question else "perturbation"
     output_file = f"data/qa_checkk_{output_str}_v{version}.csv"
+    print(f"Output file: {output_file}")
     
     with open(output_file, "w") as f:
         f.write("model,file,qa_check\n")
