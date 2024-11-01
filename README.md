@@ -58,6 +58,12 @@ python -m spacy download en_core_web_sm
 # python -m pip install --no-cache-dir --no-build-isolation flash-attn
 ```
 
+## Server setup
+```
+export CUDA_VISIBLE_DEVICES="6,7,8,9"
+export HF_HOME=/data/nikitha/huggingface/
+```
+
 ## Usage
 
 A workable example training run (of LLaVA-NeXT-Video-7B) is showcased in this [colab notebook](https://colab.research.google.com/drive/139XypY8_wdLgyLXYE_Zve7Hjd809fVpK?usp=sharing), which is a good starting point to get a sense of how to use this codebase. The following sections provide a more detailed guide on how to finetune a model.

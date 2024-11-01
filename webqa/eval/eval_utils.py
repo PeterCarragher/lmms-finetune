@@ -8,8 +8,11 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGeneration, Qwen2VLForConditionalGeneration, AutoModelForCausalLM 
 from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+import gc
 
 def get_model_processor(model_path, original_model_id=None):
+    if original_model_id is None:
+        original_model_id = model_path
     if "llava-v1.6" in model_path or "llava-1.6" in model_path:
         processor = LlavaNextProcessor.from_pretrained(original_model_id)
         model = LlavaNextForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16).to("cuda")#, low_cpu_mem_usage=True) 
@@ -98,16 +101,22 @@ def run_inference(messages, images, processor, model, conversational_prompt):
         text = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = processor(text, images, return_tensors="pt")
     inputs = inputs.to("cuda")
-    output = model.generate(
-        **inputs, 
-        max_new_tokens=20,
-        do_sample=False, 
-        # max_length=100,
-        # num_return_sequences=1,
-        # temperature=0.0,
-    )
-    return processor.decode(output[0][2:], skip_special_tokens=True)
+    decoded_output = ""
+    try:
+        output = model.generate(
+            **inputs, 
+            max_new_tokens=20,
+            do_sample=False,
+        )
+        decoded_output = processor.decode(output[0][2:], skip_special_tokens=True)
+    finally:
+        # Clean up inputs
+        del inputs
+        torch.cuda.empty_cache()  # Clear CUDA cache to free memory
+        gc.collect()
 
+    # Decode the output
+    return decoded_output
 
 def eval_on_webqa_sample(image_paths, data, processor, model, conversational_prompt, reverse_images = False):
     images = get_images(image_paths, reverse_images)
