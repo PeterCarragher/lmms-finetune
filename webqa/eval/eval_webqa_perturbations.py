@@ -5,19 +5,21 @@ from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGenera
 from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 from tqdm import tqdm
 from eval_utils import *
+import random
 
-# single image = perturbation, 2 image = conflicting
-eval_data = json.load(open("/home/pcarragh/dev/webqa/LLaVA/WebQA_train_val_color_gpt_matched.json", "r"))
-blank_image_file ='/home/pcarragh/dev/webqa/LLaVA/playground/counterfactual_exp/BLANK.jpg'
-perturbation_path = "/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa"
-use_split = True
-save = False
-keys = list(eval_data.keys())
-# qids = pd.read_csv('results/counterfactual_qa_check.csv', header=None)[0].tolist()
-# eval_data = {k: v for k, v in eval_data.items() if k in qids}
+random.seed(42)
+
+samples_per_image = 5
+save = True
+eval_data = json.load(open("/data/nikitha/VQA_data/results/WebQA_train_val_obj_v2_generated_labels_shape_color.json", "r"))
+perturbation_path = "/data/nikitha/VQA_data/results/old/bad_idx/webqa/"
+keys = [k for k in list(eval_data.keys()) if eval_data[k]['split'] == 'val' and eval_data[k]['Qcate'].lower() in ['shape', 'color']]    
+qa_check_df = pd.read_csv('../data/qa_check_perturbation_v4.csv')
+qa_check_df = qa_check_df.set_index('file')
+
 
 model_paths = [
-    ("/home/pcarragh/dev/webqa/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
     "llava-hf/llava-1.5-7b-hf",
     "llava-hf/llava-1.5-13b-hf",
     "microsoft/Phi-3-vision-128k-instruct",
@@ -31,13 +33,14 @@ model_paths = [
     # "llava-hf/llava-interleave-qwen-7b-hf",
 ]
 
-
 results = {}
-# answers.csv dump file
 exp_name = __file__.split('/')[-1].split('.')[0]
 
-with open(f"results/{exp_name}_answers.csv", "w") as f:
-    f.write("model,question_id,gen,answer\n")
+if not os.path.exists("results"):
+    os.makedirs("results")
+if not os.path.exists(f"results/{exp_name}_answers.json"):
+    with open(f"results/{exp_name}_answers.csv", "w") as f:
+        f.write("model,question_id,gen,answer\n")
 
 for model_path in model_paths:
     if isinstance(model_path, tuple):
@@ -45,90 +48,72 @@ for model_path in model_paths:
     else:
         original_model_id = model_path
     print(f"Running evaluation for model: {model_path}")
-        
-    # for finetuning...
-    # model_id = "/home/pcarragh/dev/webqa/lmms-finetune/checkpoints/llava-1.5-7b_lora-True_qlora-False/"
-    # model_path = model_id
     
     conversational_prompt = not 'Phi' in model_path
     model, processor = get_model_processor(model_path, original_model_id)
 
-    llava_results_baseline_original_label = {}
-    llava_results_baseline_perturbed_label = {}
-    llava_results_baseline_retrieval_token = {}
-    llava_results_blank_original_label = {}
-    llava_results_blank_perturbed_label = {}
-    llava_results_blank_retrieval_token = {}
-    llava_results_perturbed_original_label = {}
-    llava_results_perturbed_perturbed_label = {}
-    llava_results_perturbed_retrieval_token = {}
+    results_baseline_original_label = {}
+    results_baseline_perturbed_label = {}
+    results_perturbed_original_label = {}
+    results_perturbed_perturbed_label = {}
 
     for k in tqdm(keys):
         example = eval_data[k]
-        # if len(example['img_posFacts']) != 2:
-        #     continue
         original_image_files = [str(img_data['image_id']) for img_data in example['img_posFacts']]
-        blank_image_files = [blank_image_file for _ in example['img_posFacts']]
         try:
             baseline_answer = eval_on_webqa_sample(original_image_files, example, processor, model, conversational_prompt)
-            blank_answer = eval_on_webqa_sample(blank_image_files, example, processor, model, conversational_prompt)
         except Exception as e:
             print(f"Error: {e}")
             continue
         
-        llava_results_baseline_original_label[k] = webqa_accuracy(baseline_answer, example['A'], example['Qcate'].lower())        
-        llava_results_baseline_retrieval_token[k] = retrieval_predicted(baseline_answer)        
-        llava_results_blank_original_label[k] = webqa_accuracy(blank_answer, example['A'], example['Qcate'].lower())
-        llava_results_blank_retrieval_token[k] = retrieval_predicted(blank_answer)
-        
+        results_baseline_original_label[k] = webqa_accuracy(baseline_answer, example['A'], example['Qcate'].lower())        
+
         with open(f"results/{exp_name}_answers.csv", "a") as f:
             f.write(f"{model_path},{k},baseline,\"{baseline_answer}\"\n")
-            f.write(f"{model_path},{k},blank,\"{blank_answer}\"\n")
                     
-        llava_results_perturbed_perturbed_label[k] = {}
-        llava_results_perturbed_original_label[k] = {}
-        llava_results_perturbed_retrieval_token[k] = {}
-        llava_results_baseline_perturbed_label[k] = {}
-        llava_results_blank_perturbed_label[k] = {}
+        results_perturbed_perturbed_label[k] = {}
+        results_perturbed_original_label[k] = {}
+        results_baseline_perturbed_label[k] = {}
+        samples_checked = 0
         for idx, label in example['A_perturbed'].items():
-            generated_image_files = []
-            for img in example['img_posFacts']:
-                if use_split:
-                    generated_file = f"{perturbation_path}/{example['split']}/{str(img['image_id'])}_{k}_{idx}.jpeg"
-                else:
-                    generated_file = f"{perturbation_path}/{str(img['image_id'])}_{k}_{idx}.jpeg"
-                if os.path.exists(generated_file):
-                    generated_image_files.append(generated_file)
-                else:
-                    generated_image_files.append(str(img['image_id']))
+            idx = int(idx)
+            if samples_checked >= samples_per_image:
+                break
+            imgs = example['img_posFacts']
+            if len(imgs) == 2 and idx % 2 == 1:
+                continue
+
             try:
+                generated_image_files = []
+                for hack_idx, img in enumerate(imgs):
+                    generated_file = f"{str(img['image_id'])}_{k}_{idx + hack_idx}.jpeg"
+                    generated_path = os.path.join(perturbation_path, generated_file)
+                    generated_image_files.append(generated_path)
+
+                if any([not file_passes_qa_check(file, qa_check_df) for file in generated_image_files]):
+                    continue
                 perturbed_answer = eval_on_webqa_sample(generated_image_files, example, processor, model, conversational_prompt)
+                samples_checked += 1
             except Exception as e:
                 print(f"Error: {e}")
                 continue
             
-            llava_results_perturbed_original_label[k][idx] = webqa_accuracy(perturbed_answer, example['A'], example['Qcate'].lower())
-            llava_results_perturbed_perturbed_label[k][idx] = webqa_accuracy(perturbed_answer, [label], example['Qcate'].lower())
-            llava_results_perturbed_retrieval_token[k][idx] = retrieval_predicted(perturbed_answer)
-            llava_results_baseline_perturbed_label[k][idx] = webqa_accuracy(baseline_answer, [label], example['Qcate'].lower())
-            llava_results_blank_perturbed_label[k][idx] = webqa_accuracy(blank_answer, [label], example['Qcate'].lower())
+            results_perturbed_original_label[k][idx] = webqa_accuracy(perturbed_answer, example['A'], example['Qcate'].lower())
+            results_perturbed_perturbed_label[k][idx] = webqa_accuracy(perturbed_answer, [label], example['Qcate'].lower())
+            results_baseline_perturbed_label[k][idx] = webqa_accuracy(baseline_answer, [label], example['Qcate'].lower())
             
             with open(f"results/{exp_name}_answers.csv", "a") as f:
                 f.write(f"{model_path},{k},{str(idx)},\"{perturbed_answer}\"\n")
                
     results[model_path] = {
-        "baseline_original_label": accuracy_agg_results(llava_results_baseline_original_label, eval_data),
-        "baseline_perturbed_label": accuracy_agg_generated_results(llava_results_baseline_perturbed_label, eval_data),
-        "blank_original_label": accuracy_agg_results(llava_results_blank_original_label, eval_data),
-        "blank_perturbed_label": accuracy_agg_generated_results(llava_results_blank_perturbed_label, eval_data),
-        "perturbed_original_label": accuracy_agg_generated_results(llava_results_perturbed_original_label, eval_data),
-        "perturbed_perturbed_label": accuracy_agg_generated_results(llava_results_perturbed_perturbed_label, eval_data)
+        "baseline_original_label": accuracy_agg_results(results_baseline_original_label, eval_data),
+        "baseline_perturbed_label": accuracy_agg_generated_results(results_baseline_perturbed_label, eval_data),
+        "perturbed_original_label": accuracy_agg_generated_results(results_perturbed_original_label, eval_data),
+        "perturbed_perturbed_label": accuracy_agg_generated_results(results_perturbed_perturbed_label, eval_data)
     }
     
-    # dump to temp.json
-    with open(f"results/{exp_name}_outputs.json", "w") as f:
+    with open(f"results/model_outputs/{exp_name}_{model_path.split('/')[-1]}_outputs.json", "w") as f:
         json.dump(results, f)
-    # print(results[model_path])
 
 formatted = {}
 for model_path, result in results.items():

@@ -10,6 +10,12 @@ from transformers import AutoProcessor, AutoTokenizer, LlavaForConditionalGenera
 from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 import gc
 
+def file_passes_qa_check(file, qa_check_df):
+    file = file.split('/')[-1]
+    if not file in qa_check_df.index:
+        return False
+    return qa_check_df.loc[file]['qa_check'].lower().startswith('no')
+
 def get_model_processor(model_path, original_model_id=None):
     if not original_model_id:
         original_model_id = model_path
@@ -30,8 +36,8 @@ def get_model_processor(model_path, original_model_id=None):
         )
         processor = AutoProcessor.from_pretrained(original_model_id)
     elif "Phi" in model_path:
-        model = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda", trust_remote_code=True, torch_dtype="auto", _attn_implementation='flash_attention_2') 
-        # use _attn_implementation='eager' to disable flash attention
+        model = AutoModelForCausalLM.from_pretrained(model_path, device_map="cuda", trust_remote_code=True, torch_dtype="auto", #_attn_implementation='flash_attention_2') 
+            _attn_implementation='eager')# to disable flash attention
         processor = AutoProcessor.from_pretrained(original_model_id, trust_remote_code=True) 
     else:
         raise ValueError(f"Unknown model path: {model_path}")
@@ -105,17 +111,15 @@ def run_inference(messages, images, processor, model, conversational_prompt):
     try:
         output = model.generate(
             **inputs, 
-            max_new_tokens=20,
+            max_new_tokens=50,
             do_sample=False,
         )
         decoded_output = processor.decode(output[0][2:], skip_special_tokens=True)
     finally:
-        # Clean up inputs
         del inputs
-        torch.cuda.empty_cache()  # Clear CUDA cache to free memory
+        torch.cuda.empty_cache()
         gc.collect()
 
-    # Decode the output
     return decoded_output
 
 
@@ -123,7 +127,9 @@ def eval_on_webqa_sample(image_paths, data, processor, model, conversational_pro
     images = get_images(image_paths, reverse_images)
     messages = get_messages(data, conversational_prompt, reverse_images)
     ans = run_inference(messages, images, processor, model, conversational_prompt)
-    return ans.split('\n')[0].split('ASSISTANT: ')[0]
+    if 'Caption:' in ans:
+        ans = ans.split('\n')[-1]
+    return ans.split('ASSISTANT: ')[-1].split('\n')[0]
     # query = f"SYSTEM: {system_prompt}\nHUMAN: {query}\nGPT:"
     # print(query) 
 
@@ -154,6 +160,8 @@ retrieval_phrases = [
     "not sure", 
     "not able",     
 ]
+
+
 
 def retrieval_predicted(answer):
     return "<RET>" in answer or any([phrase in answer for phrase in retrieval_phrases])
