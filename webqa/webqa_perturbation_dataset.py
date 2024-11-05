@@ -26,7 +26,9 @@ def get_prompt(data, reverse_images = False, img_token = "<image>"):
     imgs = data['img_posFacts'] if not reverse_images else data['img_posFacts'][::-1]
     prompt = ""
     for _, img in enumerate(imgs):
-        prompt += f"{img_token}\nCaption: {img['title']}\n"
+        prompt += f"{img_token}\n"
+        if 'title' in img:
+            prompt += "Caption: {img['title']}\n"
     prompt += f"Q: {data['Q']}"
     return prompt
     
@@ -173,6 +175,62 @@ def get_conflicting_samples(train_data, perturbation_path, qa_check_df):
                 continue
     return conflicting_samples
 
+def get_vqa_counterfactual_samples(split = 'val'):
+    vqa_qid_obj_dir = f"/data/nikitha/VQA_data/VQAv2/vqav2_{split}_obj.txt"
+    vqa_data = pd.read_feather(f"/data/nikitha/VQA_data/VQAv2/vqav2_{split}.arrow")
+    image_path = "/data/nikitha/VQA_data/VQAv2/images"
+    perturbation_path = f"/data/nikitha/VQA_data/VQAv2/results/vqa_removal_{split}"
+    qa_check_df = pd.read_csv(f'../vqa/data/qa_check_counterfactual_{split}.csv')
+    qa_check_df = qa_check_df.set_index('file')
+
+    def vqa_image_path(image_id):
+        # format: val2014/COCO_val2014_000000543836.jpg
+        return f"{image_path}/{split}2014/COCO_{split}2014_{str(image_id).zfill(12)}.jpg"
+
+    eval_data = {}
+    qid_img_q = {}
+    for _,row in vqa_data.iterrows():
+        img = row['image']
+        for idx,qid in enumerate(row['question_id']):
+            qid_img_q[str(qid)] = {"img": img, "q": row['questions'][idx], "img_id": row['image_id'], "answers": row['answers'][idx]}
+
+    with open(vqa_qid_obj_dir, 'r') as f:
+        for row in f:
+            content = row.rstrip().split('\t')
+            assert len(content) == 2
+            qid = content[0]
+            if qid not in qid_img_q:
+                continue
+            llm_res = json.loads(content[1])
+            eval_data[qid] = {
+                'Q': qid_img_q[qid]['q'],
+                'img_posFacts': [{'image_id': vqa_image_path(qid_img_q[qid]['img_id'])}],
+                'A': qid_img_q[qid]['answers'],
+                'qid': qid,
+                'split': split,
+                'img_id': qid_img_q[qid]['img_id']
+            }    
+    
+    vqa_samples = {}
+    keys = list(eval_data.keys())
+    for k in tqdm(keys):
+        example = eval_data[k]
+
+        try:
+            generated_file = f"{perturbation_path}/{str(example['img_id'])}_{k}.jpeg"
+            if not os.path.exists(generated_file) or not file_passes_qa_check(generated_file, qa_check_df):
+                continue
+            
+            vqa_samples[k] = copy.deepcopy(example)
+            example['img_posFacts'][0]['image_id'] = generated_file
+            example['A'] = ['<RET>']
+            vqa_samples[k + '_counterfactual'] = example
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+
+    return vqa_samples
+
 # def convert_perturbed_data(perturbed_data):
 #     generated_samples = {}
 #     for key in perturbed_data:
@@ -203,6 +261,9 @@ def get_conflicting_samples(train_data, perturbation_path, qa_check_df):
 if __name__ == "__main__":
     version = 2
     data = json.load(open("/data/nikitha/VQA_data/WebQA_train_val_obj_v2.json", "r"))
+    
+    # TODO: drop anything that doesn't have a QA check passing generation
+    data = {k:v for k,v in data.items() if not v['Qcate'].lower() == 'text'} #in ['shape', 'color', 'yesno']}
     # perturbed_data = json.load(open("WebQA_train_val_obj_v2_generated_labels.json", "r"))
     perturbed_data = json.load(open("/data/nikitha/VQA_data/results/WebQA_train_val_obj_v2_generated_labels_shape_color.json", "r"))
     perturbated_img_path = "/data/nikitha/VQA_data/results/old/bad_idx/webqa/"
@@ -211,8 +272,7 @@ if __name__ == "__main__":
     qa_check_counterfactual_df = pd.read_csv('data/qa_check_counterfactuals_v2.csv')
     qa_check_perturbation_df = qa_check_perturbation_df.set_index('file')
     qa_check_counterfactual_df = qa_check_counterfactual_df.set_index('file')
-    
-        
+      
     train_output, val_output = convert_format(data)
     print("Original dataset: ", len(train_output), len(val_output))
 
@@ -236,6 +296,12 @@ if __name__ == "__main__":
     print("Counterfactual samples: ", len(counterfactual_train_output), len(counterfactual_val_output))
     train_output.extend(counterfactual_train_output)
     val_output.extend(counterfactual_val_output)
+        
+    vqa_counterfactual_train_output, _ = convert_format(get_vqa_counterfactual_samples('train'))
+    _, vqa_counterfactual_val_output = convert_format(get_vqa_counterfactual_samples('val'))
+    print("VQA counterfactual samples: ", len(vqa_counterfactual_train_output), len(vqa_counterfactual_val_output))
+    train_output.extend(vqa_counterfactual_train_output)
+    val_output.extend(vqa_counterfactual_val_output)
     
     print("Total samples: ", len(train_output), len(val_output))
 

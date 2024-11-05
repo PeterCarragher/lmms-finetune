@@ -41,7 +41,9 @@ def read_video_pyav(container, indices):
             frames.append(frame)
     return np.stack([x.to_ndarray(format="rgb24") for x in frames])
 
-with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.lineidx", "r") as fp_lineidx:
+# /home/pcarragh/dev/webqa/UniVL-DR/data
+data_root = "/data/nikitha/VQA_data"
+with open(f"{data_root}/imgs.lineidx", "r") as fp_lineidx:
     lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
 
 # def read_webqa_image(image_id, lineidx=lineidx):
@@ -132,7 +134,7 @@ class LazySupervisedDataset(Dataset):
                     image_path_int = None
                     
                 if image_path_int:
-                    with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
+                    with open(f"{data_root}/imgs.tsv", "r") as fp:
                         fp.seek(lineidx[int(image_id)%10000000])
                         imgid, img_base64 = fp.readline().strip().split('\t')
                     assert int(image_id) == int(imgid), f'{image_id} {imgid}'
