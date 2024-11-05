@@ -7,6 +7,7 @@ from tqdm import tqdm
 from eval_utils import *
 import random
 
+version = 2
 save = True
 blank_image_file ='/home/nikithar/Code/VQA/lmms-finetune/webqa/eval/Blank.jpg'
 eval_data = json.load(open("/data/nikitha/VQA_data/WebQA_train_val_obj_v2.json", "r"))
@@ -33,10 +34,11 @@ model_paths = [
 results = {}
 exp_name = __file__.split('/')[-1].split('.')[0]
 
+answer_file =f"results/{exp_name}_answers_v{version}.csv"
 if not os.path.exists("results"):
     os.makedirs("results")
 if not os.path.exists(f"results/{exp_name}_answers.json"):
-    with open(f"results/{exp_name}_answers.csv", "w") as f:
+    with open(answer_file, "w") as f:
         f.write("model,question_id,gen,answer\n")
 
 results = {}
@@ -98,7 +100,7 @@ for model_path in model_paths:
         results_blank_retrieval_token[k] = retrieval_predicted(blank_answer)
         results_perturbed_retrieval_token[k] = retrieval_predicted(perturbed_answer)
         
-        with open(f"results/{exp_name}_answers.csv", "a") as f:
+        with open(answer_file, "a") as f:
             f.write(f"{model_path},{k},\"{perturbed_answer}\"\n")
  
     results[model_path] = {
@@ -119,4 +121,4 @@ for model_path in model_paths:
 
 results_df = pd.DataFrame(results).T
 exp_name = __file__.split('/')[-1].split('.')[0]
-results_df.to_csv(f"results/{exp_name}_v2.csv")
+results_df.to_csv(f"results/{exp_name}_v{version}.csv")

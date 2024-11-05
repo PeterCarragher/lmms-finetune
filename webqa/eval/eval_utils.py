@@ -14,7 +14,7 @@ def file_passes_qa_check(file, qa_check_df):
     file = file.split('/')[-1]
     if not file in qa_check_df.index:
         return False
-    return qa_check_df.loc[file]['qa_check'].lower().startswith('no')
+    return qa_check_df.loc[file]['qa_check'].strip().lower().startswith('no')
 
 def get_model_processor(model_path, original_model_id=None):
     if not original_model_id:
@@ -76,6 +76,17 @@ def get_qa_check_prompt(question, conversational_prompt=True):
     message["content"].append({"type": "text", "text": question})
     return [message]
 
+def get_single_image_eval_prompt(question, conversational_prompt=True):
+    if not conversational_prompt:
+        prompt = ""
+        prompt += f"<|image_1|>\n"
+        prompt += question
+        return [{"role": "user", "content": prompt}]
+    
+    message = {"role": "user", "content": []}
+    message["content"].append({"type": "image"})
+    message["content"].append({"type": "text", "text": question})
+    return [message]
 
 def get_images(image_paths, reverse_images = False):
     images = []
@@ -99,7 +110,7 @@ def get_images(image_paths, reverse_images = False):
 # https://github.com/huggingface/transformers/issues/27922
 # system_prompt = "Answer question Q based only on the provided images.\n"
 
-def run_inference(messages, images, processor, model, conversational_prompt):
+def run_inference(messages, images, processor, model, conversational_prompt, max_tokens=50):
     if conversational_prompt:
         text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = processor(images=images, text=text, return_tensors='pt', padding=True)
@@ -111,7 +122,7 @@ def run_inference(messages, images, processor, model, conversational_prompt):
     try:
         output = model.generate(
             **inputs, 
-            max_new_tokens=50,
+            max_new_tokens=max_tokens,
             do_sample=False,
         )
         decoded_output = processor.decode(output[0][2:], skip_special_tokens=True)
@@ -122,16 +133,24 @@ def run_inference(messages, images, processor, model, conversational_prompt):
 
     return decoded_output
 
+def eval_on_vqa_sample(image, question, processor, model, conversational_prompt):
+    images = get_images([image]) if not isinstance(image, Image.Image) else [image]
+    messages = get_single_image_eval_prompt(question, conversational_prompt)
+    ans = run_inference(messages, images, processor, model, conversational_prompt, max_tokens=25)
+    return format_ans(ans)
 
 def eval_on_webqa_sample(image_paths, data, processor, model, conversational_prompt, reverse_images = False):
     images = get_images(image_paths, reverse_images)
     messages = get_messages(data, conversational_prompt, reverse_images)
     ans = run_inference(messages, images, processor, model, conversational_prompt)
-    if 'Caption:' in ans:
-        ans = ans.split('\n')[-1]
-    return ans.split('ASSISTANT: ')[-1].split('\n')[0]
+    return format_ans(ans)
     # query = f"SYSTEM: {system_prompt}\nHUMAN: {query}\nGPT:"
     # print(query) 
+    
+def format_ans(ans):
+    if 'Caption:' or '?' in ans:
+        ans = ans.split('\n')[-1]
+    return ans.split('ASSISTANT: ')[-1].split('assisstant\n')[-1].split('\n')[0]
 
 
 def webqa_accuracy(answer, label, Qcate):
@@ -148,23 +167,29 @@ def webqa_accuracy(answer, label, Qcate):
     return (F1_avg, F1_max, EM, RE_avg, PR_avg)
 
 retrieval_phrases = [
-    "white background", 
-    "sorry", 
+    "<RET>",
+    "Sorry", 
     "I cannot",# answer", 
     "I do not", 
-    "image does not", 
-    "any information", 
-    "not enough", 
-    "not clear", 
-    "not visible", 
-    "not sure", 
-    "not able",     
+    " image does not", 
+    " information", 
+    " not enough", 
+    " not clear", 
+    " not visible", 
+    " not sure", 
+    " not able",
+    " determine",
+    " blurry",    
+    " blurred",    
+    " no existence",
+    " context",
+    " apologize",
+    " sorry",
+    "white background", 
 ]
 
-
-
 def retrieval_predicted(answer):
-    return "<RET>" in answer or any([phrase in answer for phrase in retrieval_phrases])
+    return any([phrase in answer for phrase in retrieval_phrases])
 
 def ans_contains_any_label(ans, labels = ['yes', 'no']):
         return any([label in ans.lower() for label in labels])

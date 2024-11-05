@@ -9,12 +9,13 @@ import random
 
 random.seed(42)
 
+version = 2
 samples_per_image = 5
 save = True
 eval_data = json.load(open("/data/nikitha/VQA_data/results/WebQA_train_val_obj_v2_generated_labels_shape_color.json", "r"))
 perturbation_path = "/data/nikitha/VQA_data/results/old/bad_idx/webqa/"
 keys = [k for k in list(eval_data.keys()) if eval_data[k]['split'] == 'val' and eval_data[k]['Qcate'].lower() in ['shape', 'color']]    
-keys = keys[:5]
+# keys = keys[:5]
 qa_check_df = pd.read_csv('../data/qa_check_perturbation_v4.csv')
 qa_check_df = qa_check_df.set_index('file')
 
@@ -35,11 +36,11 @@ model_paths = [
 
 results = {}
 exp_name = __file__.split('/')[-1].split('.')[0]
-
+answer_file = f"results/{exp_name}_answers_v{version}.csv"
 if not os.path.exists("results"):
     os.makedirs("results")
 if not os.path.exists(f"results/{exp_name}_answers.json"):
-    with open(f"results/{exp_name}_answers.csv", "w") as f:
+    with open(answer_file, "w") as f:
         f.write("model,question_id,image_id,gen,answer\n")
 
 for model_path in model_paths:
@@ -74,7 +75,7 @@ for model_path in model_paths:
         results_baseline_original[k] = ans_contains_correct_label(baseline_answer, example['A'], example['Qcate'].lower())        
         results_baseline_retrieval_token[k] = retrieval_predicted(baseline_answer)
         
-        with open(f"results/{exp_name}_answers.csv", "a") as f:
+        with open(answer_file, "a") as f:
             f.write(f"{model_path},{k},baseline,baseline,\"{baseline_answer}\"\n")
 
         results_baseline_perturbed[k] = {}                    
@@ -117,7 +118,7 @@ for model_path in model_paths:
                     results_perturbed_perturbed[k][idx][img_idx] = ans_contains_correct_label(perturbed_answer, [label], example['Qcate'].lower())
                     results_perturbed_retrieval_token[k][idx][img_idx] = retrieval_predicted(perturbed_answer)
                     
-                    with open(f"results/{exp_name}_answers.csv", "a") as f:
+                    with open(answer_file, "a") as f:
                         f.write(f"{model_path},{k},{str(original_image_files[img_idx])},{str(idx)},\"{perturbed_answer}\"\n")   
 
                 if passed_at_least_one_qa_check:
@@ -153,4 +154,4 @@ for model_path in model_paths:
 
 results_df = pd.DataFrame(results).T
 exp_name = __file__.split('/')[-1].split('.')[0]
-results_df.to_csv(f"results/{exp_name}_v2.csv")
+results_df.to_csv(f"results/{exp_name}_v{version}.csv")
