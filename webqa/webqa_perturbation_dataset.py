@@ -1,6 +1,9 @@
 import json
 import numpy as np
 import pandas as pd
+from eval.eval_utils import *
+import os
+import copy
 
 def get_conversation(entry, reverse_images = False, supervised = True):
     prompt = get_prompt(entry, reverse_images)
@@ -57,65 +60,185 @@ def convert_format(data):
                 val_output.append(output_entry)
     return train_output, val_output
 
-def is_counterfactual_sample(entry):
-    return 'yes' in entry['A'][0].lower() and entry['Qcate'].lower()  == 'yesno'
+def substitute_label(ans, label, qcate = 'color'):
+    category_labels = copy.deepcopy(domain_dict[qcate.lower()])
+    category_labels.remove(label.lower())
+    
+    ans = ans.replace(',', ' ,').replace('.', ' .').replace('?', ' ?').replace('!', ' !')
+    ans = ans.replace('(', ' (').replace(')', ' )').replace('[', ' [').replace(']', ' ]')
+    ans = ans.replace('{', ' {').replace('}', ' }').replace(':', ' :').replace(';', ' ;')
+    ans = ans.split(' ')
+    
+    for i, word in enumerate(ans):
+        if word.lower() in category_labels:
+            ans[i] = label
+    # remove all labels from the answer
+    # ans = [word for word in ans if word.lower() not in category_labels]
+    
+    ans = ' '.join(ans)
+    ans = ans.replace(' ,', ',').replace(' .', '.').replace(' ?', '?').replace(' !', '!')
+    ans = ans.replace(' (', '(').replace(' )', ')').replace(' [', '[').replace(' ]', ']')
+    ans = ans.replace(' {', '{').replace(' }', '}').replace(' :', ':').replace(' ;', ';')
+    return ans
 
-def is_conflicting_sample(entry):
-    return len(entry['img_posFacts']) == 2 and 'A_perturbed' in entry and entry['Qcate'] in ['color', 'shape']
+def get_perturbed_samples(train_data, perturbation_path, qa_check_df):
+    data = copy.deepcopy(train_data)
+    keys = list(data.keys())
+    perturbed_samples = {}
+    for k in keys:
+        example = data[k]
+        original_image_files = [str(img_data['image_id']) for img_data in example['img_posFacts']]
+        for idx, label in example['A_perturbed'].items():
+            idx = int(idx)
+            # if samples_checked >= samples_per_image:
+            #     break
+            imgs = example['img_posFacts']
+            if len(imgs) == 2 and idx % 2 == 1:
+                continue
 
-def is_perturbed_sample(entry):
-    return len(entry['img_posFacts']) == 1 and 'A_perturbed' in entry and entry['Qcate'] in ['color', 'shape']
+            try:
+                generated_image_files = []
+                for hack_idx, img in enumerate(imgs):
+                    generated_file = f"{str(img['image_id'])}_{k}_{idx + hack_idx}.jpeg"
+                    generated_path = os.path.join(perturbation_path, generated_file)
+                    generated_image_files.append(generated_path)
 
-def convert_perturbed_data(perturbed_data):
-    generated_samples = {}
-    for key in perturbed_data:
-        entry = perturbed_data[key]
-        img_id = entry['img_posFacts'][0]['image_id']
+                if any([not file_passes_qa_check(file, qa_check_df) for file in generated_image_files]):
+                    continue
+                
+                perturbed_sample = copy.deepcopy(example)
+                for img_idx, generated_image_path in enumerate(generated_image_files):
+                    perturbed_sample['img_posFacts'][img_idx]['image_id'] = generated_image_path
+                    perturbed_sample['A'] = [substitute_label(perturbed_sample['A'][0], label, perturbed_sample['Qcate'])]
+                
+                perturbed_samples[k + '_' + str(idx) + '_perturbed'] = perturbed_sample
+                # samples_checked += 1
+            except Exception as e:
+                print(f"Error: {e}")
+                continue
+    return perturbed_samples
+
+def get_counterfactual_samples(train_data, perturbation_path, qa_check_df):
+    data = copy.deepcopy(train_data)
+    keys = list(data.keys())
+    counterfactual_samples = {}
+    for k in tqdm(keys):
+        example = data[k]
+        generated_image_files = []
+
+        try:
+            for img in example['img_posFacts']:
+                generated_file = f"{perturbation_path}/{str(img['image_id'])}_{k}.jpeg"
+                generated_image_files.append(generated_file)
+            if any([not file_passes_qa_check(file, qa_check_df) for file in generated_image_files]):
+                continue
+            
+            counterfactual_sample = copy.deepcopy(example)
+            for img_idx, generated_image_path in enumerate(generated_image_files):
+                counterfactual_sample['img_posFacts'][img_idx]['image_id'] = generated_image_path
+                counterfactual_sample['A'] = ['<RET>']
+            
+            counterfactual_samples[k + '_counterfactual'] = counterfactual_sample
+            
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+    return counterfactual_samples
+
+def get_conflicting_samples(train_data, perturbation_path, qa_check_df):
+    data = copy.deepcopy(train_data)
+    keys = list(data.keys())
+    conflicting_samples = {}
+    for k in keys:
+        example = data[k]
+        for idx, label in example['A_perturbed'].items():
+            idx = int(idx)
+            imgs = example['img_posFacts']
+            if len(imgs) == 2 and idx % 2 == 1:
+                continue
+
+            for img_idx, img in enumerate(imgs):
+                try:
+                    generated_file = f"{str(img['image_id'])}_{k}_{idx + img_idx}.jpeg"
+                    passed_qa_check = file_passes_qa_check(generated_file, qa_check_df)
+                    if not passed_qa_check:
+                        continue
+                    generated_path = os.path.join(perturbation_path, generated_file)                        
+                    conflicting_sample = copy.deepcopy(example)
+                    conflicting_sample['img_posFacts'][img_idx]['image_id'] = generated_path
+                    conflicting_sample['A'] = ['<RET>']
+                    conflicting_samples[k + '_' + str(idx) + '_conflicting'] = conflicting_sample
+                except Exception as e:
+                    print(f"Error: {e}")
+                continue
+    return conflicting_samples
+
+# def convert_perturbed_data(perturbed_data):
+#     generated_samples = {}
+#     for key in perturbed_data:
+#         entry = perturbed_data[key]
+#         img_id = entry['img_posFacts'][0]['image_id']
         
-        if is_perturbed_sample(entry):
-            for sample_id, label in entry['A_perturbed'].items():
-                generated_image_path = f"/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa/{entry['split']}/{str(img_id)}_{key}_{sample_id}.jpeg"
-                entry['img_posFacts'][0]['image_id'] = generated_image_path
-                entry['A'] = [label]
-                generated_samples[key + '_' + str(img_id) + '_' + str(sample_id)] = entry
-        elif is_conflicting_sample(entry):
-            # TODO: with new generations, we can take every permutation of 1st and 2nd image, generated and ungenerated
-            # also we will have 2 image generations where both images are generated to same label, these are not conflicting but are positive examples
-            for sample_id, label in entry['A_perturbed'].items():
-                generated_image_path = f"/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa/{entry['split']}/{str(img_id)}_{key}_{sample_id}.jpeg"
-                entry['img_posFacts'][0]['image_id'] = generated_image_path
-                entry['A'] = ['<RET>']
-                generated_samples[key + '_' + str(img_id) + '_' + str(sample_id)] = entry
-        elif is_counterfactual_sample(entry):
-            generated_image_path = f"/home/pcarragh/dev/webqa/image_gen_val/val_images_perturbed_gpt_obj_lama/{str(img_id)}_{key}.jpeg"
-            entry['img_posFacts'][0]['image_id'] = generated_image_path
-            entry['A'] = ['<RET>']
-            generated_samples['countefactual_' + key + '_' + str(img_id)] = entry
-    return convert_format(generated_samples)
+#         if is_perturbed_sample(entry):
+#             for sample_id, label in entry['A_perturbed'].items():
+#                 generated_image_path = f"/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa/{entry['split']}/{str(img_id)}_{key}_{sample_id}.jpeg"
+#                 entry['img_posFacts'][0]['image_id'] = generated_image_path
+#                 entry['A'] = [label]
+#                 generated_samples[key + '_' + str(img_id) + '_' + str(sample_id)] = entry
+#         elif is_conflicting_sample(entry):
+#             # TODO: with new generations, we can take every permutation of 1st and 2nd image, generated and ungenerated
+#             # also we will have 2 image generations where both images are generated to same label, these are not conflicting but are positive examples
+#             for sample_id, label in entry['A_perturbed'].items():
+#                 generated_image_path = f"/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa/{entry['split']}/{str(img_id)}_{key}_{sample_id}.jpeg"
+#                 entry['img_posFacts'][0]['image_id'] = generated_image_path
+#                 entry['A'] = ['<RET>']
+#                 generated_samples[key + '_' + str(img_id) + '_' + str(sample_id)] = entry
+#         elif is_counterfactual_sample(entry):
+#             generated_image_path = f"/home/pcarragh/dev/webqa/image_gen_val/val_images_perturbed_gpt_obj_lama/{str(img_id)}_{key}.jpeg"
+#             entry['img_posFacts'][0]['image_id'] = generated_image_path
+#             entry['A'] = ['<RET>']
+#             generated_samples['countefactual_' + key + '_' + str(img_id)] = entry
+#     return convert_format(generated_samples)
 
 if __name__ == "__main__":
     version = 2
-    data = json.load(open("/home/pcarragh/dev/webqa/MultiModalQA/data/WebQA_train_val_obj_v2.json.pert.lama.v3", "r"))
-    perturbed_data = json.load(open("/home/pcarragh/dev/webqa/LLaVA/WebQA_train_val_color_gpt_matched.json", "r"))
-    counterfactual_data = json.load(open("/home/pcarragh/dev/webqa/MultiModalQA/data/WebQA_train_val_obj_v2.json", "r"))
-    qids = list(set(pd.read_csv('data/counterfactual_qa_check.csv', header=None)[0].tolist()))
-    counterfactual_data = {k: v for k, v in counterfactual_data.items() if k in qids and is_counterfactual_sample(v)}
+    data = json.load(open("/data/nikitha/VQA_data/WebQA_train_val_obj_v2.json", "r"))
+    # perturbed_data = json.load(open("WebQA_train_val_obj_v2_generated_labels.json", "r"))
+    perturbed_data = json.load(open("/data/nikitha/VQA_data/results/WebQA_train_val_obj_v2_generated_labels_shape_color.json", "r"))
+    perturbated_img_path = "/data/nikitha/VQA_data/results/old/bad_idx/webqa/"
+    counterfactual_img_path = "/data/nikitha/VQA_data/results/webqa_yesno/"
+    qa_check_perturbation_df = pd.read_csv('data/qa_check_perturbation_v4.csv')
+    qa_check_counterfactual_df = pd.read_csv('data/qa_check_counterfactuals_v2.csv')
+    qa_check_perturbation_df = qa_check_perturbation_df.set_index('file')
+    qa_check_counterfactual_df = qa_check_counterfactual_df.set_index('file')
+    
         
     train_output, val_output = convert_format(data)
-    print(len(train_output), len(val_output))
+    print("Original dataset: ", len(train_output), len(val_output))
 
-    perturbed_train_output, perturbed_val_output = convert_perturbed_data(perturbed_data)
-    print(len(perturbed_data), len(perturbed_train_output), len(perturbed_val_output))
+    conflicting_train_output, conflicting_val_output = convert_format(
+        get_conflicting_samples(perturbed_data, perturbated_img_path, qa_check_perturbation_df)
+    )
+    print("Conflicting samples: ", len(conflicting_train_output), len(conflicting_val_output))
+    train_output.extend(conflicting_train_output)
+    val_output.extend(conflicting_val_output)
+
+    perturbed_train_output, perturbed_val_output = convert_format(
+        get_perturbed_samples(perturbed_data, perturbated_img_path, qa_check_perturbation_df)
+    )
+    print("Perturbed samples: ", len(perturbed_train_output), len(perturbed_val_output))
     train_output.extend(perturbed_train_output)
     val_output.extend(perturbed_val_output)
 
-    counterfactual_train_output, counterfactual_val_output = convert_perturbed_data(counterfactual_data)
-    print(len(counterfactual_data), len(counterfactual_train_output), len(counterfactual_val_output))
+    counterfactual_train_output, counterfactual_val_output = convert_format(
+        get_counterfactual_samples(data, counterfactual_img_path, qa_check_counterfactual_df)
+    )
+    print("Counterfactual samples: ", len(counterfactual_train_output), len(counterfactual_val_output))
     train_output.extend(counterfactual_train_output)
     val_output.extend(counterfactual_val_output)
-    print(len(train_output), len(val_output))
+    
+    print("Total samples: ", len(train_output), len(val_output))
 
-    # Save the result to a new JSON file
     with open(f'data/webqa_train_gen_formatted_v{version}.json', 'w') as f:
         json.dump(train_output, f, indent=4)
         
