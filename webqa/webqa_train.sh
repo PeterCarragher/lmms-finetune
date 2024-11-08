@@ -1,13 +1,6 @@
-NUM_GPUS=2
-DISTRIBUTED_ARGS="
-    --nnodes=1 \
-    --nproc_per_node ${NUM_GPUS} \
-    --rdzv_backend c10d \
-    --rdzv_endpoint localhost:0
-"
-
 # arguments that are very likely to be changed
 # according to your own case
+# MODEL_ID=qwen2-vl-7b-instruct
 MODEL_ID=llava-1.5-7b                                   # model id; pick on by running `python supported_models.py`
 # MODEL_ID=llava-1.5-7b
 VERSION=2                                   # model id; pick on by running `python supported_models.py`
@@ -33,11 +26,23 @@ RUN_ID=${MODEL_ID}_v${VERSION}_lora-${USE_LORA}_qlora-${Q_LORA}     # a custom r
 DS_STAGE=zero3                                          # deepspeed stage; < zero2 | zero3 >
 PER_DEVICE_BATCH_SIZE=8                                 # batch size per GPU
 GRAD_ACCUM=1                                            # gradient accumulation steps
-NUM_EPOCHS=5                                            # number of training epochs
+NUM_EPOCHS=2                                            # number of training epochs
 
 LR=2e-5                                                 # learning rate
-MODEL_MAX_LEN=512                                       # maximum input length of the model
+MODEL_MAX_LEN=256                                       # maximum input length of the model
 
+export TORCH_NCCL_BLOCKING_WAIT=1
+export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+export NCCL_P2P_DISABLE=1
+# export CUDA_VISIBLE_DEVICES=1,3,4,5,6,7,8,9
+
+NUM_GPUS=4
+DISTRIBUTED_ARGS="
+    --nnodes=1 \
+    --nproc_per_node ${NUM_GPUS} \
+    --rdzv_backend c10d \
+    --rdzv_endpoint localhost:0
+"
 
 torchrun $DISTRIBUTED_ARGS train.py \
     --model_id $MODEL_ID \
@@ -46,7 +51,6 @@ torchrun $DISTRIBUTED_ARGS train.py \
     --output_dir ./checkpoints/$RUN_ID \
     --report_to wandb \
     --run_name $RUN_ID \
-    --deepspeed ./ds_configs/${DS_STAGE}.json \
     --bf16 True \
     --num_train_epochs $NUM_EPOCHS \
     --per_device_train_batch_size $PER_DEVICE_BATCH_SIZE \
@@ -59,10 +63,8 @@ torchrun $DISTRIBUTED_ARGS train.py \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
-    --logging_steps 1 \
-    --tf32 True \
     --model_max_length $MODEL_MAX_LEN \
-    --gradient_checkpointing True \
+    --logging_steps 1 \
     --dataloader_num_workers 4 \
     --train_vision_encoder $TRAIN_VISION_ENCODER \
     --use_vision_lora $USE_VISION_LORA \
@@ -70,7 +72,11 @@ torchrun $DISTRIBUTED_ARGS train.py \
     --use_lora $USE_LORA \
     --q_lora $Q_LORA \
     --lora_r $LORA_R \
-    --lora_alpha $LORA_ALPHA
+    --lora_alpha $LORA_ALPHA \
+    --gradient_checkpointing True
+    # --deepspeed ./ds_configs/${DS_STAGE}.json
+    # --use_triton_attention  True \
+    # --tf32 True
     # --image_folder $IMAGE_FOLDER \
     # --video_folder $VIDEO_FOLDER \
         # --num_frames $NUM_FRAMES \

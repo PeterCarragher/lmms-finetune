@@ -5,6 +5,8 @@ from eval.eval_utils import *
 import os
 import copy
 
+counterfactual_answer = '<RET> Sorry, I cannot determine the answer as there is not enough information. <RET>'
+
 def get_conversation(entry, reverse_images = False, supervised = True):
     prompt = get_prompt(entry, reverse_images)
     conversations = [
@@ -28,7 +30,7 @@ def get_prompt(data, reverse_images = False, img_token = "<image>"):
     for _, img in enumerate(imgs):
         prompt += f"{img_token}\n"
         if 'title' in img:
-            prompt += "Caption: {img['title']}\n"
+            prompt += f"Caption: {img['title']}\n"
     prompt += f"Q: {data['Q']}"
     return prompt
     
@@ -138,7 +140,7 @@ def get_counterfactual_samples(train_data, perturbation_path, qa_check_df):
             counterfactual_sample = copy.deepcopy(example)
             for img_idx, generated_image_path in enumerate(generated_image_files):
                 counterfactual_sample['img_posFacts'][img_idx]['image_id'] = generated_image_path
-                counterfactual_sample['A'] = ['<RET>']
+                counterfactual_sample['A'] = [counterfactual_answer]
             
             counterfactual_samples[k + '_counterfactual'] = counterfactual_sample
             
@@ -168,7 +170,7 @@ def get_conflicting_samples(train_data, perturbation_path, qa_check_df):
                     generated_path = os.path.join(perturbation_path, generated_file)                        
                     conflicting_sample = copy.deepcopy(example)
                     conflicting_sample['img_posFacts'][img_idx]['image_id'] = generated_path
-                    conflicting_sample['A'] = ['<RET>']
+                    conflicting_sample['A'] = ['<RET> Sorry, there is conflicting information. <RET>']
                     conflicting_samples[k + '_' + str(idx) + '_conflicting'] = conflicting_sample
                 except Exception as e:
                     print(f"Error: {e}")
@@ -223,7 +225,7 @@ def get_vqa_counterfactual_samples(split = 'val'):
             
             vqa_samples[k] = copy.deepcopy(example)
             example['img_posFacts'][0]['image_id'] = generated_file
-            example['A'] = ['<RET>']
+            example['A'] = [counterfactual_answer]
             vqa_samples[k + '_counterfactual'] = example
         except Exception as e:
             print(f"Error: {e}")
@@ -231,37 +233,11 @@ def get_vqa_counterfactual_samples(split = 'val'):
 
     return vqa_samples
 
-# def convert_perturbed_data(perturbed_data):
-#     generated_samples = {}
-#     for key in perturbed_data:
-#         entry = perturbed_data[key]
-#         img_id = entry['img_posFacts'][0]['image_id']
-        
-#         if is_perturbed_sample(entry):
-#             for sample_id, label in entry['A_perturbed'].items():
-#                 generated_image_path = f"/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa/{entry['split']}/{str(img_id)}_{key}_{sample_id}.jpeg"
-#                 entry['img_posFacts'][0]['image_id'] = generated_image_path
-#                 entry['A'] = [label]
-#                 generated_samples[key + '_' + str(img_id) + '_' + str(sample_id)] = entry
-#         elif is_conflicting_sample(entry):
-#             # TODO: with new generations, we can take every permutation of 1st and 2nd image, generated and ungenerated
-#             # also we will have 2 image generations where both images are generated to same label, these are not conflicting but are positive examples
-#             for sample_id, label in entry['A_perturbed'].items():
-#                 generated_image_path = f"/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/webqa/{entry['split']}/{str(img_id)}_{key}_{sample_id}.jpeg"
-#                 entry['img_posFacts'][0]['image_id'] = generated_image_path
-#                 entry['A'] = ['<RET>']
-#                 generated_samples[key + '_' + str(img_id) + '_' + str(sample_id)] = entry
-#         elif is_counterfactual_sample(entry):
-#             generated_image_path = f"/home/pcarragh/dev/webqa/image_gen_val/val_images_perturbed_gpt_obj_lama/{str(img_id)}_{key}.jpeg"
-#             entry['img_posFacts'][0]['image_id'] = generated_image_path
-#             entry['A'] = ['<RET>']
-#             generated_samples['countefactual_' + key + '_' + str(img_id)] = entry
-#     return convert_format(generated_samples)
 
 if __name__ == "__main__":
     version = 2
     data = json.load(open("/data/nikitha/VQA_data/WebQA_train_val_obj_v2.json", "r"))
-    
+    save = True
     # TODO: drop anything that doesn't have a QA check passing generation
     data = {k:v for k,v in data.items() if not v['Qcate'].lower() == 'text'} #in ['shape', 'color', 'yesno']}
     # perturbed_data = json.load(open("WebQA_train_val_obj_v2_generated_labels.json", "r"))
@@ -305,10 +281,11 @@ if __name__ == "__main__":
     
     print("Total samples: ", len(train_output), len(val_output))
 
-    with open(f'data/webqa_train_gen_formatted_v{version}.json', 'w') as f:
-        json.dump(train_output, f, indent=4)
-        
-    with open(f'data/webqa_val_gen_formatted_v{version}.json', 'w') as f:
-        json.dump(val_output, f, indent=4)
+    if save:
+        with open(f'data/webqa_train_gen_formatted_v{version}.json', 'w') as f:
+            json.dump(train_output, f, indent=4)
+            
+        with open(f'data/webqa_val_gen_formatted_v{version}.json', 'w') as f:
+            json.dump(val_output, f, indent=4)
 
     print("Conversion complete. Output saved.")

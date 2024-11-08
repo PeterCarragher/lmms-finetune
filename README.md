@@ -60,6 +60,11 @@ python -m spacy download en_core_web_sm
 
 ## Server setup
 ```
+virtualenv -p python3.10 lmms-train
+source lmms-train/bin/activate
+pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 export CUDA_VISIBLE_DEVICES="6,7,8,9"
 export HF_HOME=/data/nikitha/huggingface/
 ```

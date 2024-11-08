@@ -21,6 +21,7 @@ from tqdm import tqdm
 import random
 
 save = True
+version=3
 blank_image_file ='/home/nikithar/Code/VQA/lmms-finetune/webqa/eval/Blank.jpg'
 vqa_qid_obj_dir = "/data/nikitha/VQA_data/VQAv2/vqav2_val_obj.txt"
 vqa_data = pd.read_feather("/data/nikitha/VQA_data/VQAv2/vqav2_val.arrow")
@@ -30,11 +31,12 @@ qa_check_df = pd.read_csv('../data/qa_check_counterfactual_val.csv')
 qa_check_df = qa_check_df.set_index('file')
 
 model_paths = [
-    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False", "llava-hf/llava-1.5-7b-hf"), # RET trained
-    "llava-hf/llava-1.5-7b-hf",
-    "llava-hf/llava-1.5-13b-hf",
-    "microsoft/Phi-3-vision-128k-instruct",
-    "Qwen/Qwen2-VL-7B-Instruct",
+    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/data_v2/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    # ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    # "llava-hf/llava-1.5-7b-hf",
+    # "llava-hf/llava-1.5-13b-hf",
+    # "microsoft/Phi-3-vision-128k-instruct",
+    # "Qwen/Qwen2-VL-7B-Instruct",
 ]
 
 eval_data = {}
@@ -64,7 +66,7 @@ with open(vqa_qid_obj_dir, 'r') as f:
 
 
 keys = list(eval_data.keys())
-exp_name = __file__.split('/')[-1].split('.')[0]
+exp_name = __file__.split('/')[-1].split('.')[0] + f"_v{version}"
 
 if not os.path.exists("results"):
     os.makedirs("results")
@@ -144,4 +146,4 @@ for model_path in model_paths:
 
 results_df = pd.DataFrame(results).T
 exp_name = __file__.split('/')[-1].split('.')[0]
-results_df.to_csv(f"results/{exp_name}_v2.csv")
+results_df.to_csv(f"results/{exp_name}.csv")

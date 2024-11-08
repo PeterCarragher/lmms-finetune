@@ -9,6 +9,7 @@ import random
 
 random.seed(42)
 
+version = 3
 samples_per_image = 5
 save = True
 eval_data = json.load(open("/data/nikitha/VQA_data/results/WebQA_train_val_obj_v2_generated_labels_shape_color.json", "r"))
@@ -19,11 +20,12 @@ qa_check_df = qa_check_df.set_index('file')
 
 
 model_paths = [
-    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
-    "llava-hf/llava-1.5-7b-hf",
-    "llava-hf/llava-1.5-13b-hf",
-    "microsoft/Phi-3-vision-128k-instruct",
-    "Qwen/Qwen2-VL-7B-Instruct",
+    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/data_v2/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    # ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    # "llava-hf/llava-1.5-7b-hf",
+    # "llava-hf/llava-1.5-13b-hf",
+    # "microsoft/Phi-3-vision-128k-instruct",
+    # "Qwen/Qwen2-VL-7B-Instruct",
 
     # single image only:
     # "llava-hf/llava-v1.6-vicuna-7b-hf",
@@ -34,7 +36,7 @@ model_paths = [
 ]
 
 results = {}
-exp_name = __file__.split('/')[-1].split('.')[0]
+exp_name = __file__.split('/')[-1].split('.')[0] + f"_v{version}"
 
 if not os.path.exists("results"):
     os.makedirs("results")

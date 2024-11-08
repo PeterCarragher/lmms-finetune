@@ -1,5 +1,6 @@
 import os
 os.environ["WANDB_PROJECT"]= "lmms-ft"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "4,5,6,7,8,9"
 from dataclasses import asdict
 import math
 from pathlib import Path
@@ -10,7 +11,7 @@ from accelerate.utils import DistributedType
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import torch
 import transformers
-from transformers import Trainer, deepspeed
+from transformers import Trainer
 
 
 from arguments import ModelArguments, DataArguments, TrainingArguments, LoraArguments
@@ -47,7 +48,7 @@ def train():
     device_map = None
     if lora_args.q_lora:
         device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if int(os.environ.get("WORLD_SIZE", 1)) != 1 else None
-        if len(training_args.fsdp) > 0 or deepspeed.is_deepspeed_zero3_enabled():
+        if len(training_args.fsdp) > 0:# or deepspeed.is_deepspeed_zero3_enabled():
             raise ValueError("FSDP or ZeRO3 are not incompatible with QLoRA.")
 
     # llm quantization config (for q-lora)
@@ -69,7 +70,7 @@ def train():
         compute_dtype=compute_dtype,
         bnb_config=bnb_config,
         use_flash_attn=training_args.use_flash_attn,
-        device_map=device_map,
+        device_map=None, #device_map,
     )
     model, tokenizer, processor = loader.load()
     tokenizer.model_max_length = training_args.model_max_length
@@ -143,7 +144,7 @@ def train():
             )
             
         model = get_peft_model(model, lora_config)
-        
+    
     # print trainable parameters for inspection
     rank0_print("Trainable parameters:")
     for name, param in model.named_parameters():
