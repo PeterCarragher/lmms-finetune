@@ -40,7 +40,7 @@ def get_prompt(data, reverse_images = False, img_token = "<image>"):
 #     # return f"{img['image_id']}.jpeg")
 #     pass
 
-def convert_format(data):
+def convert_format(data, type, dataset):
     train_output = []
     val_output = []
     for key in data:
@@ -55,7 +55,9 @@ def convert_format(data):
             output_entry = {
                 "system_prompt": "Answer the question Q. If you need help answer <RET> to get the context.",
                 "image": image_paths,
-                "conversations": conversations
+                "conversations": conversations,
+                "type": type,
+                "dataset": dataset
             }
             
             if entry['split'] == 'train':
@@ -214,6 +216,7 @@ def get_vqa_counterfactual_samples(split = 'val'):
             }    
     
     vqa_samples = {}
+    vqa_counterfactual_samples = {}
     keys = list(eval_data.keys())
     for k in tqdm(keys):
         example = eval_data[k]
@@ -226,12 +229,12 @@ def get_vqa_counterfactual_samples(split = 'val'):
             vqa_samples[k] = copy.deepcopy(example)
             example['img_posFacts'][0]['image_id'] = generated_file
             example['A'] = [counterfactual_answer]
-            vqa_samples[k + '_counterfactual'] = example
+            vqa_counterfactual_samples[k + '_counterfactual'] = example
         except Exception as e:
             print(f"Error: {e}")
             continue
 
-    return vqa_samples
+    return vqa_samples, vqa_counterfactual_samples
 
 
 if __name__ == "__main__":
@@ -249,35 +252,47 @@ if __name__ == "__main__":
     qa_check_perturbation_df = qa_check_perturbation_df.set_index('file')
     qa_check_counterfactual_df = qa_check_counterfactual_df.set_index('file')
       
-    train_output, val_output = convert_format(data)
+    train_output, val_output = convert_format(data, 'original', 'webqa')
     print("Original dataset: ", len(train_output), len(val_output))
 
     conflicting_train_output, conflicting_val_output = convert_format(
-        get_conflicting_samples(perturbed_data, perturbated_img_path, qa_check_perturbation_df)
+        get_conflicting_samples(perturbed_data, perturbated_img_path, qa_check_perturbation_df),
+        'conflicting', 'webqa'
     )
     print("Conflicting samples: ", len(conflicting_train_output), len(conflicting_val_output))
     train_output.extend(conflicting_train_output)
     val_output.extend(conflicting_val_output)
 
     perturbed_train_output, perturbed_val_output = convert_format(
-        get_perturbed_samples(perturbed_data, perturbated_img_path, qa_check_perturbation_df)
+        get_perturbed_samples(perturbed_data, perturbated_img_path, qa_check_perturbation_df),
+        'perturbed', 'webqa'
     )
     print("Perturbed samples: ", len(perturbed_train_output), len(perturbed_val_output))
     train_output.extend(perturbed_train_output)
     val_output.extend(perturbed_val_output)
 
     counterfactual_train_output, counterfactual_val_output = convert_format(
-        get_counterfactual_samples(data, counterfactual_img_path, qa_check_counterfactual_df)
+        get_counterfactual_samples(data, counterfactual_img_path, qa_check_counterfactual_df),
+        'counterfactual', 'webqa'
     )
     print("Counterfactual samples: ", len(counterfactual_train_output), len(counterfactual_val_output))
     train_output.extend(counterfactual_train_output)
     val_output.extend(counterfactual_val_output)
         
-    vqa_counterfactual_train_output, _ = convert_format(get_vqa_counterfactual_samples('train'))
-    _, vqa_counterfactual_val_output = convert_format(get_vqa_counterfactual_samples('val'))
+    vqa_train_samples, vqa_train_counterfactual_samples = get_vqa_counterfactual_samples('train')
+    vqa_val_samples, vqa_val_counterfactual_samples = get_vqa_counterfactual_samples('val')
+    
+    vqa_counterfactual_train_output, _ = convert_format(vqa_train_counterfactual_samples, 'counterfactual', 'vqa')
+    _, vqa_counterfactual_val_output = convert_format(vqa_val_counterfactual_samples, 'counterfactual', 'vqa')
     print("VQA counterfactual samples: ", len(vqa_counterfactual_train_output), len(vqa_counterfactual_val_output))
     train_output.extend(vqa_counterfactual_train_output)
     val_output.extend(vqa_counterfactual_val_output)
+    
+    vqa_train_output, _ = convert_format(vqa_train_samples, 'original', 'vqa')
+    _, vqa_val_output = convert_format(vqa_val_samples, 'original', 'vqa')
+    print("VQA original samples: ", len(vqa_train_output), len(vqa_val_output))
+    train_output.extend(vqa_train_output)
+    val_output.extend(vqa_val_output)
     
     print("Total samples: ", len(train_output), len(val_output))
 
