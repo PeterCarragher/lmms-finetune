@@ -23,7 +23,7 @@ def get_model_processor(model_path, original_model_id=None):
             # low_cpu_mem_usage=True, 
         ).to("cuda")
         processor = AutoProcessor.from_pretrained(original_model_id)
-    elif "Qwen" in model_path:
+    elif "qwen" in model_path.lower():
         model = Qwen2VLForConditionalGeneration.from_pretrained(
             model_path, torch_dtype="auto", 
             device_map="auto"

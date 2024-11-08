@@ -10,7 +10,7 @@ from accelerate.utils import DistributedType
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import torch
 import transformers
-from transformers import Trainer, deepspeed
+from transformers import Trainer
 
 
 from arguments import ModelArguments, DataArguments, TrainingArguments, LoraArguments
@@ -47,7 +47,7 @@ def train():
     device_map = None
     if lora_args.q_lora:
         device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)} if int(os.environ.get("WORLD_SIZE", 1)) != 1 else None
-        if len(training_args.fsdp) > 0 or deepspeed.is_deepspeed_zero3_enabled():
+        if len(training_args.fsdp) > 0:# or deepspeed.is_deepspeed_zero3_enabled():
             raise ValueError("FSDP or ZeRO3 are not incompatible with QLoRA.")
 
     # llm quantization config (for q-lora)

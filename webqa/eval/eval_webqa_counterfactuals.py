@@ -17,18 +17,21 @@ with open(data_dir, 'r') as f:
 eval_data = {k: v for k, v in eval_data.items() if k in qids}
 
 model_paths = [
-    "liuhaotian/llava-v1.6-vicuna-7b", 
-    "liuhaotian/llava-v1.6-vicuna-13b", 
-    "liuhaotian/llava-v1.6-mistral-7b", 
-    "liuhaotian/llava-v1.6-34b",
-    # "liuhaotian/llava-v1.5-7b", 
-    # "liuhaotian/llava-v1.5-13b"
+    ("/home/pcarragh/dev/webqa/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    "llava-hf/llava-1.5-7b-hf",
+    "llava-hf/llava-1.5-13b-hf",
+    "microsoft/Phi-3-vision-128k-instruct",
+    "Qwen/Qwen2-VL-7B-Instruct",
+    # "liuhaotian/llava-v1.6-vicuna-7b", 
+    # "liuhaotian/llava-v1.6-vicuna-13b", 
+    # "liuhaotian/llava-v1.6-mistral-7b", 
+    # "liuhaotian/llava-v1.6-34b",
 ]
 blank_image_file ='/home/pcarragh/dev/webqa/LLaVA/playground/counterfactual_exp/BLANK.jpg'
 perturbation_path = "/home/pcarragh/dev/webqa/image_gen_val/val_images_perturbed_gpt_obj_lama"
 
 results = {}
-prompt_addition = "Answer the following question based only on the provided images. If the image does not containt the answer, respond with 'n/a'.\n"
+prompt_addition = "Answer the following question based only on the provided images. If the image does not contain the answer, respond with 'n/a'.\n"
 
 for model_path in model_paths:
     print(f"Running evaluation for model: {model_path}")

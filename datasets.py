@@ -21,6 +21,37 @@ TO_LOAD_IMAGE: Dict[str, bool] = {
 }
 
 
+def convert_format(dataset):
+    output = []
+    for sample in dataset:
+        output.append({
+            "query": sample['conversations'][0]['value'],
+            "response": sample['conversations'][1]['value'],
+            "images": sample['image'],
+        })
+    return output
+        
+
+def update_paths(dataset):
+    for sample in dataset:
+        try:
+            images = sample['image']
+            for idx, image in enumerate(images):
+                img_id = int(image)
+                sample['image'][idx] = f"/home/pcarragh/dev/webqa/images/webqa/{img_id}.jpeg"
+        except:
+            continue
+    return dataset
+
+def save_webqa_image(image_id):
+    with open("/home/pcarragh/dev/webqa/UniVL-DR/data/imgs.tsv", "r") as fp:
+        fp.seek(lineidx[int(image_id)%10000000])
+        imgid, img_base64 = fp.readline().strip().split('\t')
+    assert int(image_id) == int(imgid), f'{image_id} {imgid}'
+    img = Image.open(BytesIO(base64.b64decode(img_base64))).convert("RGB")
+    img.save(f"/home/pcarragh/dev/webqa/images/webqa/{image_id}.jpeg")
+
+
 def read_video_pyav(container, indices):
     '''
     Decode the video with PyAV decoder.

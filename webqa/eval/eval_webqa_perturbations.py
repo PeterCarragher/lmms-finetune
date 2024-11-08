@@ -13,10 +13,14 @@ perturbation_path = "/home/pcarragh/dev/webqa/segment/Inpaint-Anything/results/w
 use_split = True
 save = False
 keys = list(eval_data.keys())
-# qids = pd.read_csv('results/counterfactual_qa_check.csv', header=None)[0].tolist()
+# TODO: filter out 'Yes' answers from QA checks
+# qids = pd.read_csv('results/qa_check_perturbations_v2.csv')
+# qids = qids[qids['qa_check'].str.lower.startswith('yes')]
+# qids[0].tolist()
 # eval_data = {k: v for k, v in eval_data.items() if k in qids}
 
 model_paths = [
+    ("/home/pcarragh/dev/webqa/ms-swift/output/qwen2-vl-7b-instruct/v23-20241107-113517/", "Qwen/Qwen2-VL-7B-Instruct"),
     ("/home/pcarragh/dev/webqa/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
     "llava-hf/llava-1.5-7b-hf",
     "llava-hf/llava-1.5-13b-hf",
