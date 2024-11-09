@@ -7,7 +7,7 @@ from tqdm import tqdm
 from eval_utils import *
 import random
 
-version = 2
+version = 3
 save = True
 blank_image_file ='/home/nikithar/Code/VQA/lmms-finetune/webqa/eval/Blank.jpg'
 eval_data = json.load(open("/data/nikitha/VQA_data/WebQA_train_val_obj_v2.json", "r"))
@@ -18,11 +18,12 @@ qa_check_df = pd.read_csv('../data/qa_check_counterfactuals_v2.csv')
 qa_check_df = qa_check_df.set_index('file')
 
 model_paths = [
-    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False", "llava-hf/llava-1.5-7b-hf"), # RET trained
-    "llava-hf/llava-1.5-7b-hf",
-    "llava-hf/llava-1.5-13b-hf",
-    "microsoft/Phi-3-vision-128k-instruct",
-    "Qwen/Qwen2-VL-7B-Instruct",
+    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/data_v2/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    # ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    # "llava-hf/llava-1.5-7b-hf",
+    # "llava-hf/llava-1.5-13b-hf",
+    # "microsoft/Phi-3-vision-128k-instruct",
+    # "Qwen/Qwen2-VL-7B-Instruct",
     # single image only:
     # "llava-hf/llava-v1.6-vicuna-7b-hf",
     # "llava-hf/llava-v1.6-vicuna-13b-hf",
@@ -52,7 +53,15 @@ for model_path in model_paths:
     print(f"Running evaluation for model: {model_path}")
     
     conversational_prompt = not 'Phi' in model_path
-    model, processor = get_model_processor(model_path, original_model_id)
+    if model_path.endswith(".jsonl"):
+        # read answer file instead of loading model
+        model = None
+        processor = None
+        answers = json.load(open(model_path, "r"))
+        val_set = json.load(open("../data/webqa_val_gen_formatted_v2.json", "r"))
+        
+    else:
+        model, processor = get_model_processor(model_path, original_model_id)
 
     results_baseline_correct = {}
     results_baseline_any = {}

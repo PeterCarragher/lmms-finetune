@@ -1,0 +1,6 @@
+images directories
+ok-vqa /data/nikitha/VQA_data/OK-VQA/object_removal/
+vqav2 val /data/nikitha/VQA_data/VQAv2/results/vqa_removal_val/
+vqav2 train /data/nikitha/VQA_data/VQAv2/results/vqa_removal_train/
+webqa yesno /data/nikitha/VQA_data/results/webqa_yesno/
+webqa color_shape /data/nikitha/VQA_data/results/old/bad_idx/webqa/

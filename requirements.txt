@@ -20,5 +20,5 @@ gradio
 
 spacy
 word2number
-optimum
-auto-gptq
+# optimum
+# auto-gptq

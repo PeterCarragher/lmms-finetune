@@ -120,6 +120,10 @@ class LazySupervisedDataset(Dataset):
             # in some cases this may cause slight differences
             # but should totally be fine (e.g., official llava-1.5 does padding,
             # but llava-1.5-hf (huggingface's implementation) does not)
+            
+            
+
+            
             if isinstance(source["image"], list):
                 image_sources = source["image"]
             elif isinstance(source["image"], str):
@@ -138,11 +142,15 @@ class LazySupervisedDataset(Dataset):
                         fp.seek(lineidx[int(image_id)%10000000])
                         imgid, img_base64 = fp.readline().strip().split('\t')
                     assert int(image_id) == int(imgid), f'{image_id} {imgid}'
-                    images.append(Image.open(BytesIO(base64.b64decode(img_base64))))
+                    img_data = base64.b64decode(img_base64)
+                    if not isinstance(img_data, bytes):
+                        raise TypeError("Decoded image data is not in bytes format.")
+                    images.append(Image.open(BytesIO(img_data)))
                 else:
                     if self.image_folder is not None:
                         image_id = os.path.join(self.image_folder, image_id)
                     images.append(Image.open(image_id).convert("RGB"))
+                    
                 # images.append(
                 #     Image.open(image_path).convert("RGB")
                 #     if self.load_image else image_path

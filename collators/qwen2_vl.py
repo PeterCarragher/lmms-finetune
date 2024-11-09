@@ -106,8 +106,9 @@ class Qwen2VLDataCollator(BaseDataCollator):
                 
                 cur_input_ids.append(system_message_input_ids.squeeze(0))
                 cur_labels.append(system_labels.squeeze(0))
-                
-            for idx, j in enumerate(range(0, len(cur_text), 2)):
+            
+            # print(cur_text)
+            for idx, j in enumerate(range(0, len(cur_text) - 1, 2)):
                 user_input = cur_text[j]
                 gpt_response = cur_text[j + 1]
                 user_input = f"{DEFAULT_IM_START_TOKEN}{user_input['role']}\n{user_input['content']}\n{DEFAULT_IM_END_TOKEN}\n"
