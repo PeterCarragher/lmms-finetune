@@ -33,8 +33,8 @@ color_set = set(domain_dict['color'])
 shape_set = set(domain_dict['shape'])
 yesno_set = set(domain_dict['yesno'])
 
-# data_root = "/home/pcarragh/dev/webqa/UniVL-DR/data"
-data_root = "/data/nikitha/VQA_data"
+data_root = "/home/pcarragh/dev/webqa/UniVL-DR/data"
+# data_root = "/data/nikitha/VQA_data"
 
 with open(f"{data_root}/imgs.lineidx", "r") as fp_lineidx:
     lineidx = [int(i.strip()) for i in fp_lineidx.readlines()]
