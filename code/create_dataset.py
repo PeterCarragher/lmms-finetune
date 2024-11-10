@@ -332,7 +332,7 @@ if __name__ == "__main__":
     data = {k:v for k,v in data.items() if v['Qcate'].lower() in ['shape', 'color', 'yesno']}
     # perturbed_data = json.load(open("WebQA_train_val_obj_v2_generated_labels.json", "r"))
     perturbed_data = json.load(open("/data/nikitha/VQA_data/results/WebQA_train_val_obj_v2_generated_labels_shape_color.json", "r"))
-    perturbated_img_path = "webqa/object_perurbation"
+    perturbated_img_path = "webqa/object_perturbation"
     counterfactual_img_path = "webqa/object_removal"
     qa_check_perturbation_df = pd.read_csv('../data/qa_check_perturbation_v4.csv')
     qa_check_counterfactual_df = pd.read_csv('../data/qa_check_counterfactuals_v2.csv')
@@ -401,16 +401,16 @@ if __name__ == "__main__":
     okvqa_train_samples, okvqa_train_counterfactual_samples = get_okvqa_counterfactual_samples('train')
     okvqa_val_samples, okvqa_val_counterfactual_samples = get_okvqa_counterfactual_samples('val')
     
-    okvqa_counterfactual_train_output, _ = convert_format(okvqa_train_counterfactual_samples, 'counterfactual', 'vqa')
-    _, okvqa_counterfactual_val_output = convert_format(okvqa_val_counterfactual_samples, 'counterfactual', 'vqa')
+    okvqa_counterfactual_train_output, _ = convert_format(okvqa_train_counterfactual_samples, 'counterfactual', 'okvqa')
+    _, okvqa_counterfactual_val_output = convert_format(okvqa_val_counterfactual_samples, 'counterfactual', 'okvqa')
     print("OKVQA counterfactual samples: ", len(okvqa_counterfactual_train_output), len(okvqa_counterfactual_val_output))
     if sample:
         okvqa_counterfactual_val_output = random.sample(okvqa_counterfactual_val_output, sample)
     train_output.extend(okvqa_counterfactual_train_output)
     val_output.extend(okvqa_counterfactual_val_output)
     
-    okvqa_train_output, _ = convert_format(okvqa_train_samples, 'original', 'vqa')
-    _, okvqa_val_output = convert_format(okvqa_val_samples, 'original', 'vqa')
+    okvqa_train_output, _ = convert_format(okvqa_train_samples, 'original', 'okvqa')
+    _, okvqa_val_output = convert_format(okvqa_val_samples, 'original', 'okvqa')
     print("OKVQA original samples: ", len(okvqa_train_output), len(okvqa_val_output))
     if not sample:
         train_output.extend(okvqa_train_output)
@@ -419,11 +419,14 @@ if __name__ == "__main__":
     print("Total samples: ", len(train_output), len(val_output))
 
     if save:
-        if not sample:
+        if sample:
+            with open(f'../data/segsub_data_labelling_sample.json', 'w') as f:
+                json.dump(val_output, f, indent=4)
+        else:
             with open(f'../data/segsub_data_train_v{version}.json', 'w') as f:
                 json.dump(train_output, f, indent=4)
-                
-        with open(f'../data/segsub_data_val_v{version}.json', 'w') as f:
-            json.dump(val_output, f, indent=4)
+        
+            with open(f'../data/segsub_data_val_v{version}.json', 'w') as f:
+                json.dump(val_output, f, indent=4)
 
     print("Conversion complete. Output saved.")

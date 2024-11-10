@@ -9,7 +9,23 @@ import random
 
 random.seed(42)
 
-dataset = json.load(open("../data/segsub_data_val_v2.json", "r"))
+dataset = json.load(open("../data/segsub_data_val_v4.json", "r"))
+segsub_dir = "/data/nikitha/VQA_data/segsub_images"
+coco_image_dir = "/data/nikitha/VQA_data/VQAv2/images/val2014"
+# webqa_image_dir = "/data/nikitha/VQA_data/images/webqa/images"
+
+def get_image_paths(sample):
+    paths = []
+    for image in sample['image']:
+        if isinstance(image, int):
+            assert(sample['dataset'] == 'webqa')
+            paths.append(image)
+        elif sample['type'] == 'original':
+            assert(sample['dataset'] in ['vqa', 'okvqa'])
+            paths.append(f"{coco_image_dir}/{image}")
+        else:
+            paths.append(f"{segsub_dir}/{image}")
+    return paths
 
 original_samples = {}
 for idx, sample in enumerate(dataset):
@@ -20,7 +36,7 @@ for idx, sample in enumerate(dataset):
 model_paths = [
     ("../finetuned_results/qwen2_finetuned.jsonl", "Qwen/Qwen2-VL-7B-Instruct"), # RET trained
     "Qwen/Qwen2-VL-7B-Instruct",
-    ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/data_v2/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
+    # ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/data_v2/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
     # ("/home/nikithar/Code/VQA/lmms-finetune/checkpoints/llava-1.5-7b_v2_lora-True_qlora-False/", "llava-hf/llava-1.5-7b-hf"), # RET trained
     "llava-hf/llava-1.5-7b-hf",
     "llava-hf/llava-1.5-13b-hf",
@@ -75,22 +91,23 @@ for model_path in model_paths:
             "counterfactual": [],
         },
         "vqa": {            
-            "perturbed": [],
-            "conflicting": [],
+            # "perturbed": [],
+            # "conflicting": [],
             "counterfactual": [],
         },
         "okvqa": {
-            "perturbed": [],
-            "conflicting": [],
+            # "perturbed": [],
+            # "conflicting": [],
             "counterfactual": [],
         },
     }
     
-    
+    # sample dataset
+    dataset = random.sample(dataset, 500)
     for idx, sample in tqdm(enumerate(dataset), total=len(dataset)):
         eval_dataset_id = sample['dataset']
         eval_type = sample['type']
-        if eval_dataset_id != 'vqa' or eval_type == 'original' or not f"{eval_dataset_id}_{sample['id']}" in original_samples:
+        if eval_type == 'original' or not f"{eval_dataset_id}_{sample['id']}" in original_samples:
             continue
         original_sample = original_samples[f"{eval_dataset_id}_{sample['id']}"]
         old_label = original_sample['conversations'][1]["value"]
@@ -106,8 +123,9 @@ for model_path in model_paths:
             else:
                 captions = []
             try:
-                new_answer = eval_on_sample(sample['image'], question, captions, processor, model, conversational_prompt)
-                old_images = original_sample['image']
+                new_images = get_image_paths(sample)
+                new_answer = eval_on_sample(new_images, question, captions, processor, model, conversational_prompt)
+                old_images = get_image_paths(original_sample)
                 old_answer = eval_on_sample(old_images, question, captions, processor, model, conversational_prompt)
             except Exception as e:
                 print(f"Error: {e}")
