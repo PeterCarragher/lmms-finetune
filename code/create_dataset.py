@@ -324,12 +324,12 @@ def get_vqa_counterfactual_samples(split = 'val', perturbation_path = "vqa/objec
 if __name__ == "__main__":
     random.seed(42)
 
-    sample = 100
+    sample = None
     version = 4
     data = json.load(open("/data/nikitha/VQA_data/WebQA_train_val_obj_v2.json", "r"))
     save = True
     # TODO: drop anything that doesn't have a QA check passing generation
-    data = {k:v for k,v in data.items() if not v['Qcate'].lower() == 'text'} #in ['shape', 'color', 'yesno']}
+    data = {k:v for k,v in data.items() if v['Qcate'].lower() in ['shape', 'color', 'yesno']}
     # perturbed_data = json.load(open("WebQA_train_val_obj_v2_generated_labels.json", "r"))
     perturbed_data = json.load(open("/data/nikitha/VQA_data/results/WebQA_train_val_obj_v2_generated_labels_shape_color.json", "r"))
     perturbated_img_path = "webqa/object_perurbation"
