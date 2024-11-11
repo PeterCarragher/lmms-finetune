@@ -122,13 +122,13 @@ def format_ans(ans):
 
 def webqa_accuracy(answer, label, Qcate):
     if Qcate == 'color':
-        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label[0], "", color_set)
+        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label, "", color_set)
     elif Qcate == 'shape': 
-        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label[0], "", shape_set)
+        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label, "", shape_set)
     elif Qcate == 'yesno': 
-        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label[0], "", yesno_set)
+        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label, "", yesno_set)
     elif Qcate == 'number': 
-        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label[0], "", {"NUMBER"})
+        F1_avg, F1_max, EM, RE_avg, PR_avg = compute_vqa_metrics([answer], label, "", {"NUMBER"})
     else:
         return None
     return (F1_avg, F1_max, EM, RE_avg, PR_avg)
@@ -156,17 +156,17 @@ retrieval_phrases = [
 ]
 
 def retrieval_predicted(answer):
-    return any([phrase in answer for phrase in retrieval_phrases])
+    return int(any([phrase in answer for phrase in retrieval_phrases]))
 
 def ans_contains_any_label(ans, qcate):
     labels = []
     for q in qcate:
         labels.extend(domain_dict[q])
-    return any([label in ans.lower() for label in labels])
+    return int(any([label in ans.lower() for label in labels]))
     
 def ans_contains_correct_label(ans, correct_ans, qcates):
-    if isinstance(qcates, str) and qcates == 'vqa':
-        return correct_ans.strip().lower() in ans.lower() 
+    if isinstance(qcates, str) and qcates in ['vqa', 'okvqa']:
+        return int(correct_ans.strip().lower() in ans.lower())
     
     pr_max = 0
     for qcate in qcates:
